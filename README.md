@@ -1,4 +1,3 @@
-```markdown
 # bashutils
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/monster0506/bashutils-go)](https://goreportcard.com/report/monster0506/bashutils-go)
@@ -321,4 +320,3 @@ open an issue or submit a pull request.
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE)
 file for details.
-```
