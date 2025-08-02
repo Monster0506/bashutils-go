@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
 	"sort"
 	"strconv"
@@ -19,31 +20,40 @@ var sortCmd = &cobra.Command{
 		numeric, _ := cmd.Flags().GetBool("numeric-sort")
 		unique, _ := cmd.Flags().GetBool("unique")
 
-		file, err := os.Open(args[0])
+		// Expand glob patterns in file argument
+		expandedFiles, err := utils.ExpandGlobsForReading(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "sort: %v\n", err)
 			return
 		}
-		defer file.Close()
 
-		var lines []string
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			lines = append(lines, scanner.Text())
-		}
+		var allLines []string
+		for _, path := range expandedFiles {
+			file, err := os.Open(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "sort: %v\n", err)
+				continue
+			}
+			defer file.Close()
 
-		if err := scanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "sort: reading input: %v\n", err)
-			return
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				allLines = append(allLines, scanner.Text())
+			}
+
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "sort: reading input: %v\n", err)
+				return
+			}
 		}
 
 		if numeric {
-			sort.Slice(lines, func(i, j int) bool {
-				numI, errI := strconv.ParseFloat(lines[i], 64)
-				numJ, errJ := strconv.ParseFloat(lines[j], 64)
+			sort.Slice(allLines, func(i, j int) bool {
+				numI, errI := strconv.ParseFloat(allLines[i], 64)
+				numJ, errJ := strconv.ParseFloat(allLines[j], 64)
 
 				if errI != nil && errJ != nil {
-					return lines[i] < lines[j] // Fallback to string sort if both are not numbers
+					return allLines[i] < allLines[j] // Fallback to string sort if both are not numbers
 				}
 				if errI != nil {
 					return false // Non-numeric treated as larger if compare to numeric
@@ -54,29 +64,29 @@ var sortCmd = &cobra.Command{
 				return numI < numJ
 			})
 		} else {
-			sort.Strings(lines)
+			sort.Strings(allLines)
 		}
 
 		if reverse {
-			for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
-				lines[i], lines[j] = lines[j], lines[i]
+			for i, j := 0, len(allLines)-1; i < j; i, j = i+1, j-1 {
+				allLines[i], allLines[j] = allLines[j], allLines[i]
 			}
 		}
 
 		if unique {
 			var uniqueLines []string
-			if len(lines) > 0 {
-				uniqueLines = append(uniqueLines, lines[0])
-				for i := 1; i < len(lines); i++ {
-					if lines[i] != lines[i-1] {
-						uniqueLines = append(uniqueLines, lines[i])
+			if len(allLines) > 0 {
+				uniqueLines = append(uniqueLines, allLines[0])
+				for i := 1; i < len(allLines); i++ {
+					if allLines[i] != allLines[i-1] {
+						uniqueLines = append(uniqueLines, allLines[i])
 					}
 				}
 			}
-			lines = uniqueLines
+			allLines = uniqueLines
 		}
 
-		for _, line := range lines {
+		for _, line := range allLines {
 			fmt.Println(line)
 		}
 	},

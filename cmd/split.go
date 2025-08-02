@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"io"
 	"os"
 	"path/filepath"
@@ -35,7 +36,20 @@ var splitCmd = &cobra.Command{
 			return
 		}
 
-		inputFile, err := os.Open(filePath)
+		// Expand glob patterns in file argument
+		expandedFiles, err := utils.ExpandGlobsForReading([]string{filePath})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "split: %v\n", err)
+			return
+		}
+
+		// For split, we only process the first file if multiple files match
+		if len(expandedFiles) == 0 {
+			fmt.Fprintf(os.Stderr, "split: no matching files found\n")
+			return
+		}
+
+		inputFile, err := os.Open(expandedFiles[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "split: %v\n", err)
 			return

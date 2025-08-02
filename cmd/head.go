@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -13,15 +14,33 @@ var headCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		lines, _ := cmd.Flags().GetInt("lines")
-		f, err := os.Open(args[0])
+		
+		// Expand glob patterns in arguments
+		expandedArgs, err := utils.ExpandGlobsForReading(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "head: %v\n", err)
 			return
 		}
-		defer f.Close()
-		scanner := bufio.NewScanner(f)
-		for i := 0; i < lines && scanner.Scan(); i++ {
-			fmt.Println(scanner.Text())
+		
+		for _, path := range expandedArgs {
+			if len(expandedArgs) > 1 {
+				fmt.Printf("==> %s <==\n", path)
+			}
+			
+			f, err := os.Open(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "head: %v\n", err)
+				continue
+			}
+			defer f.Close()
+			scanner := bufio.NewScanner(f)
+			for i := 0; i < lines && scanner.Scan(); i++ {
+				fmt.Println(scanner.Text())
+			}
+			
+			if len(expandedArgs) > 1 && path != expandedArgs[len(expandedArgs)-1] {
+				fmt.Println()
+			}
 		}
 	},
 }

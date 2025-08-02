@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
 	"sort"
 
@@ -18,41 +19,50 @@ var uniqCmd = &cobra.Command{
 		repeated, _ := cmd.Flags().GetBool("repeated")
 		unique, _ := cmd.Flags().GetBool("unique")
 
-		file, err := os.Open(args[0])
+		// Expand glob patterns in file argument
+		expandedFiles, err := utils.ExpandGlobsForReading(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "uniq: %v\n", err)
 			return
 		}
-		defer file.Close()
 
-		scanner := bufio.NewScanner(file)
-		var lines []string
-		for scanner.Scan() {
-			lines = append(lines, scanner.Text())
-		}
+		var allLines []string
+		for _, path := range expandedFiles {
+			file, err := os.Open(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "uniq: %v\n", err)
+				continue
+			}
+			defer file.Close()
 
-		if err := scanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "uniq: reading input: %v\n", err)
-			return
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				allLines = append(allLines, scanner.Text())
+			}
+
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "uniq: reading input: %v\n", err)
+				return
+			}
 		}
 
 		// uniq typically operates on sorted input.
 		// For simplicity, we'll sort here if the input isn't guaranteed to be.
 		// A more "unix-like" implementation would expect sorted input from a pipe.
-		sort.Strings(lines)
+		sort.Strings(allLines)
 
-		if len(lines) == 0 {
+		if len(allLines) == 0 {
 			return
 		}
 
-		currentLine := lines[0]
+		currentLine := allLines[0]
 		currentCount := 1
-		for i := 1; i < len(lines); i++ {
-			if lines[i] == currentLine {
+		for i := 1; i < len(allLines); i++ {
+			if allLines[i] == currentLine {
 				currentCount++
 			} else {
 				printUniqLine(currentLine, currentCount, count, repeated, unique)
-				currentLine = lines[i]
+				currentLine = allLines[i]
 				currentCount = 1
 			}
 		}

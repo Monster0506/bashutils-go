@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
 	"strings"
 
@@ -28,9 +29,16 @@ var pasteCmd = &cobra.Command{
 			return
 		}
 
-		files := make([]*os.File, len(args))
-		scanners := make([]*bufio.Scanner, len(args))
-		for i, filePath := range args {
+		// Expand glob patterns in file arguments
+		expandedArgs, err := utils.ExpandGlobsForReading(args)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "paste: %v\n", err)
+			return
+		}
+
+		files := make([]*os.File, len(expandedArgs))
+		scanners := make([]*bufio.Scanner, len(expandedArgs))
+		for i, filePath := range expandedArgs {
 			file, err := os.Open(filePath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "paste: %v\n", err)

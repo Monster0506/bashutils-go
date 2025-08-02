@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
 	"os"
 	"strings"
@@ -16,31 +17,40 @@ var wcCmd = &cobra.Command{
 		showWords, _ := cmd.Flags().GetBool("words")
 		showBytes, _ := cmd.Flags().GetBool("bytes")
 
-		data, err := os.ReadFile(args[0])
+		// Expand glob patterns in arguments
+		expandedArgs, err := utils.ExpandGlobsForReading(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "wc: %v\n", err)
 			return
 		}
-		content := string(data)
-		lines := strings.Count(content, "\n")
-		words := len(strings.Fields(content))
-		bytes := len(data)
 
-		out := []string{}
-		if showLines {
-			out = append(out, fmt.Sprintf("%d", lines))
-		}
-		if showWords {
-			out = append(out, fmt.Sprintf("%d", words))
-		}
-		if showBytes {
-			out = append(out, fmt.Sprintf("%d", bytes))
-		}
+		for _, path := range expandedArgs {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "wc: %v\n", err)
+				continue
+			}
+			content := string(data)
+			lines := strings.Count(content, "\n")
+			words := len(strings.Fields(content))
+			bytes := len(data)
 
-		if len(out) == 0 {
-			fmt.Printf("%d %d %d %s\n", lines, words, bytes, args[0])
-		} else {
-			fmt.Printf("%s %s\n", strings.Join(out, " "), args[0])
+			out := []string{}
+			if showLines {
+				out = append(out, fmt.Sprintf("%d", lines))
+			}
+			if showWords {
+				out = append(out, fmt.Sprintf("%d", words))
+			}
+			if showBytes {
+				out = append(out, fmt.Sprintf("%d", bytes))
+			}
+
+			if len(out) == 0 {
+				fmt.Printf("%d %d %d %s\n", lines, words, bytes, path)
+			} else {
+				fmt.Printf("%s %s\n", strings.Join(out, " "), path)
+			}
 		}
 	},
 }

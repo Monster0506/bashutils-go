@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
 	"regexp"
 
@@ -36,31 +37,48 @@ var grepCmd = &cobra.Command{
 			return
 		}
 
-		file, err := os.Open(filePath)
+		// Expand glob patterns in file argument
+		expandedFiles, err := utils.ExpandGlobsForReading([]string{filePath})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "grep: %v\n", err)
 			return
 		}
-		defer file.Close()
 
-		scanner := bufio.NewScanner(file)
-		lineNum := 0
-		for scanner.Scan() {
-			lineNum++
-			line := scanner.Text()
-			match := re.MatchString(line)
+		for _, path := range expandedFiles {
+			if len(expandedFiles) > 1 {
+				fmt.Printf("==> %s <==\n", path)
+			}
 
-			if (match && !invertMatch) || (!match && invertMatch) {
-				if lineNumber {
-					fmt.Printf("%d:%s\n", lineNum, line)
-				} else {
-					fmt.Println(line)
+			file, err := os.Open(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "grep: %v\n", err)
+				continue
+			}
+			defer file.Close()
+
+			scanner := bufio.NewScanner(file)
+			lineNum := 0
+			for scanner.Scan() {
+				lineNum++
+				line := scanner.Text()
+				match := re.MatchString(line)
+
+				if (match && !invertMatch) || (!match && invertMatch) {
+					if lineNumber {
+						fmt.Printf("%d:%s\n", lineNum, line)
+					} else {
+						fmt.Println(line)
+					}
 				}
 			}
-		}
 
-		if err := scanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "grep: reading input: %v\n", err)
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "grep: reading input: %v\n", err)
+			}
+
+			if len(expandedFiles) > 1 && path != expandedFiles[len(expandedFiles)-1] {
+				fmt.Println()
+			}
 		}
 	},
 }

@@ -12,8 +12,15 @@ func ReadAllFromFilesOrStdin(files []string) (string, error) {
 	if len(files) == 0 {
 		return ReadAllFromReader(os.Stdin)
 	}
+	
+	// Expand glob patterns in file arguments
+	expandedFiles, err := ExpandGlobsForReading(files)
+	if err != nil {
+		return "", err
+	}
+	
 	var sb strings.Builder
-	for _, f := range files {
+	for _, f := range expandedFiles {
 		file, err := os.Open(f)
 		if err != nil {
 			return "", fmt.Errorf("%s: %v", f, err)

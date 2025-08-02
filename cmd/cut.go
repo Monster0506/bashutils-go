@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
 	"strconv"
 	"strings"
@@ -24,25 +25,34 @@ var cutCmd = &cobra.Command{
 			return
 		}
 
-		file, err := os.Open(args[0])
+		// Expand glob patterns in file argument
+		expandedFiles, err := utils.ExpandGlobsForReading(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cut: %v\n", err)
 			return
 		}
-		defer file.Close()
 
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if fields != "" {
-				printFields(line, delimiter, fields)
-			} else if characters != "" {
-				printCharacters(line, characters)
+		for _, path := range expandedFiles {
+			file, err := os.Open(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "cut: %v\n", err)
+				continue
 			}
-		}
+			defer file.Close()
 
-		if err := scanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "cut: reading input: %v\n", err)
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if fields != "" {
+					printFields(line, delimiter, fields)
+				} else if characters != "" {
+					printCharacters(line, characters)
+				}
+			}
+
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "cut: reading input: %v\n", err)
+			}
 		}
 	},
 }
