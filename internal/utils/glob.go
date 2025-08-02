@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"regexp"
 )
 
 // ExpandGlobs takes a slice of arguments and expands any glob patterns
@@ -90,4 +91,29 @@ func ExpandGlobsForReading(args []string) ([]string, error) {
 	}
 	
 	return readable, nil
+}
+
+// ExpandEnvironmentVariables expands both Unix-style ($VAR) and Windows-style (%VAR%) environment variables
+func ExpandEnvironmentVariables(input string) string {
+	// First expand Unix-style variables ($VAR)
+	unixRegex := regexp.MustCompile(`\$([A-Za-z_][A-Za-z0-9_]*)`)
+	result := unixRegex.ReplaceAllStringFunc(input, func(match string) string {
+		varName := match[1:] // Remove the $ prefix
+		if value := os.Getenv(varName); value != "" {
+			return value
+		}
+		return match // Return original if not found
+	})
+
+	// Then expand Windows-style variables (%VAR%)
+	winRegex := regexp.MustCompile(`%([A-Za-z_][A-Za-z0-9_]*)%`)
+	result = winRegex.ReplaceAllStringFunc(result, func(match string) string {
+		varName := match[1 : len(match)-1] // Remove the % prefix and suffix
+		if value := os.Getenv(varName); value != "" {
+			return value
+		}
+		return match // Return original if not found
+	})
+
+	return result
 } 
