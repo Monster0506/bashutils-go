@@ -1,0 +1,5 @@
+This is a test of certain things.
+It has 2 lines and several words.
+Another line with more content.
+error: Something went wrong.
+WARNING: Proceed with caution.
