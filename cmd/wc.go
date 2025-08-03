@@ -24,16 +24,25 @@ var wcCmd = &cobra.Command{
 			return
 		}
 
+		var totalLines, totalWords, totalBytes int
+		var validFiles []string
+
 		for _, path := range expandedArgs {
 			data, err := os.ReadFile(path)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "wc: %v\n", err)
 				continue
 			}
+			validFiles = append(validFiles, path)
+			
 			content := string(data)
 			lines := strings.Count(content, "\n")
 			words := len(strings.Fields(content))
 			bytes := len(data)
+
+			totalLines += lines
+			totalWords += words
+			totalBytes += bytes
 
 			out := []string{}
 			if showLines {
@@ -50,6 +59,25 @@ var wcCmd = &cobra.Command{
 				fmt.Printf("%d %d %d %s\n", lines, words, bytes, path)
 			} else {
 				fmt.Printf("%s %s\n", strings.Join(out, " "), path)
+			}
+		}
+
+		if len(validFiles) > 1 {
+			out := []string{}
+			if showLines {
+				out = append(out, fmt.Sprintf("%d", totalLines))
+			}
+			if showWords {
+				out = append(out, fmt.Sprintf("%d", totalWords))
+			}
+			if showBytes {
+				out = append(out, fmt.Sprintf("%d", totalBytes))
+			}
+
+			if len(out) == 0 {
+				fmt.Printf("%d %d %d total\n", totalLines, totalWords, totalBytes)
+			} else {
+				fmt.Printf("%s total\n", strings.Join(out, " "))
 			}
 		}
 	},
