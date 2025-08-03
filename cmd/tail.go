@@ -9,9 +9,9 @@ import (
 )
 
 var tailCmd = &cobra.Command{
-	Use:   "tail [file]",
+	Use:   "tail [files...]",
 	Short: "Output the last part of files",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		n, _ := cmd.Flags().GetInt("lines")
 		

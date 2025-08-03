@@ -9,9 +9,9 @@ import (
 )
 
 var wcCmd = &cobra.Command{
-	Use:   "wc [file]",
+	Use:   "wc [files...]",
 	Short: "Print newline, word, and byte counts for each file",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		showLines, _ := cmd.Flags().GetBool("lines")
 		showWords, _ := cmd.Flags().GetBool("words")

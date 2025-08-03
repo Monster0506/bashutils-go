@@ -9,9 +9,9 @@ import (
 )
 
 var headCmd = &cobra.Command{
-	Use:   "head [file]",
+	Use:   "head [files...]",
 	Short: "Output the first part of files",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		lines, _ := cmd.Flags().GetInt("lines")
 		

@@ -12,9 +12,9 @@ import (
 )
 
 var sortCmd = &cobra.Command{
-	Use:   "sort [file]",
+	Use:   "sort [files...]",
 	Short: "Sort lines of text files",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		reverse, _ := cmd.Flags().GetBool("reverse")
 		numeric, _ := cmd.Flags().GetBool("numeric-sort")

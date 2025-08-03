@@ -11,9 +11,9 @@ import (
 )
 
 var grepCmd = &cobra.Command{
-	Use:   "grep [pattern] [file]",
+	Use:   "grep [pattern] [files...]",
 	Short: "Print lines matching a pattern",
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		patternStr := args[0]
 		filePath := args[1]

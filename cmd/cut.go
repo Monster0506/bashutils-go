@@ -12,9 +12,9 @@ import (
 )
 
 var cutCmd = &cobra.Command{
-	Use:   "cut [file]",
+	Use:   "cut [files...]",
 	Short: "Extract specific columns or byte ranges from lines",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fields, _ := cmd.Flags().GetString("fields")
 		delimiter, _ := cmd.Flags().GetString("delimiter")

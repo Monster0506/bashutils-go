@@ -11,9 +11,9 @@ import (
 )
 
 var uniqCmd = &cobra.Command{
-	Use:   "uniq [file]",
+	Use:   "uniq [files...]",
 	Short: "Filter out repeated lines",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		count, _ := cmd.Flags().GetBool("count")
 		repeated, _ := cmd.Flags().GetBool("repeated")
