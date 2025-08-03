@@ -6,7 +6,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
-
+	"strings"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +18,7 @@ var sortCmd = &cobra.Command{
 		reverse, _ := cmd.Flags().GetBool("reverse")
 		numeric, _ := cmd.Flags().GetBool("numeric-sort")
 		unique, _ := cmd.Flags().GetBool("unique")
+		column, _ := cmd.Flags().GetInt("key")
 
 		allLines, err := utils.ReadLinesFromFilesOrStdin(args)
 		if err != nil {
@@ -25,25 +26,42 @@ var sortCmd = &cobra.Command{
 			return
 		}
 
-		if numeric {
-			sort.Slice(allLines, func(i, j int) bool {
-				numI, errI := strconv.ParseFloat(allLines[i], 64)
-				numJ, errJ := strconv.ParseFloat(allLines[j], 64)
+		sort.Slice(allLines, func(i, j int) bool {
+			var keyI, keyJ string
+
+			if column > 0 {
+				columnsI := strings.Fields(allLines[i])
+				columnsJ := strings.Fields(allLines[j])
+
+				if column <= len(columnsI) {
+					keyI = columnsI[column-1]
+				}
+				if column <= len(columnsJ) {
+					keyJ = columnsJ[column-1]
+				}
+			} else {
+				keyI = allLines[i]
+				keyJ = allLines[j]
+			}
+
+			if numeric {
+				numI, errI := strconv.ParseFloat(keyI, 64)
+				numJ, errJ := strconv.ParseFloat(keyJ, 64)
 
 				if errI != nil && errJ != nil {
-					return allLines[i] < allLines[j] // Fallback to string sort if both are not numbers
+					return keyI < keyJ
 				}
 				if errI != nil {
-					return false // Non-numeric treated as larger if compare to numeric
+					return false
 				}
 				if errJ != nil {
-					return true // Non-numeric treated as larger if compare to numeric
+					return true
 				}
 				return numI < numJ
-			})
-		} else {
-			sort.Strings(allLines)
-		}
+			}
+
+			return keyI < keyJ
+		})
 
 		if reverse {
 			for i, j := 0, len(allLines)-1; i < j; i, j = i+1, j-1 {
@@ -74,4 +92,5 @@ func init() {
 	sortCmd.Flags().BoolP("reverse", "r", false, "sort in reverse order")
 	sortCmd.Flags().BoolP("numeric-sort", "n", false, "compare according to string numerical value")
 	sortCmd.Flags().BoolP("unique", "u", false, "output only the first of an equal run")
+	sortCmd.Flags().IntP("key", "k", 0, "sort by the specified column (1-based index)")
 }
