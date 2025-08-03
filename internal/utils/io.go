@@ -51,3 +51,36 @@ func ReadLines(r io.Reader) ([]string, error) {
 	}
 	return lines, scanner.Err()
 }
+
+// ReadLinesFromFilesOrStdin reads lines from files or stdin if no files provided
+// This is the common pattern used by commands like sort, uniq, grep, etc.
+func ReadLinesFromFilesOrStdin(files []string) ([]string, error) {
+	if len(files) == 0 {
+		// Read from stdin when no files provided
+		return ReadLines(os.Stdin)
+	}
+	
+	// Expand glob patterns in file arguments
+	expandedFiles, err := ExpandGlobsForReading(files)
+	if err != nil {
+		return nil, err
+	}
+	
+	var allLines []string
+	for _, path := range expandedFiles {
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %v", path, err)
+		}
+		
+		lines, err := ReadLines(file)
+		file.Close()
+		if err != nil {
+			return nil, fmt.Errorf("%s: %v", path, err)
+		}
+		
+		allLines = append(allLines, lines...)
+	}
+	
+	return allLines, nil
+}

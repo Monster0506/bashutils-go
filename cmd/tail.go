@@ -11,29 +11,13 @@ import (
 var tailCmd = &cobra.Command{
 	Use:   "tail [files...]",
 	Short: "Output the last part of files",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		n, _ := cmd.Flags().GetInt("lines")
 		
-		// Expand glob patterns in arguments
-		expandedArgs, err := utils.ExpandGlobsForReading(args)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "tail: %v\n", err)
-			return
-		}
-		
-		for _, path := range expandedArgs {
-			if len(expandedArgs) > 1 {
-				fmt.Printf("==> %s <==\n", path)
-			}
-			
-			f, err := os.Open(path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "tail: %v\n", err)
-				continue
-			}
-			defer f.Close()
-			scanner := bufio.NewScanner(f)
+		if len(args) == 0 {
+			// Read from stdin when no files provided
+			scanner := bufio.NewScanner(os.Stdin)
 			lines := []string{}
 			for scanner.Scan() {
 				lines = append(lines, scanner.Text())
@@ -44,9 +28,40 @@ var tailCmd = &cobra.Command{
 			for _, line := range lines {
 				fmt.Println(line)
 			}
+		} else {
+			// Expand glob patterns in arguments
+			expandedArgs, err := utils.ExpandGlobsForReading(args)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "tail: %v\n", err)
+				return
+			}
 			
-			if len(expandedArgs) > 1 && path != expandedArgs[len(expandedArgs)-1] {
-				fmt.Println()
+			for _, path := range expandedArgs {
+				if len(expandedArgs) > 1 {
+					fmt.Printf("==> %s <==\n", path)
+				}
+				
+				f, err := os.Open(path)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "tail: %v\n", err)
+					continue
+				}
+				defer f.Close()
+				scanner := bufio.NewScanner(f)
+				lines := []string{}
+				for scanner.Scan() {
+					lines = append(lines, scanner.Text())
+					if len(lines) > n {
+						lines = lines[1:]
+					}
+				}
+				for _, line := range lines {
+					fmt.Println(line)
+				}
+				
+				if len(expandedArgs) > 1 && path != expandedArgs[len(expandedArgs)-1] {
+					fmt.Println()
+				}
 			}
 		}
 	},

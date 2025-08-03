@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
@@ -14,37 +13,16 @@ import (
 var sortCmd = &cobra.Command{
 	Use:   "sort [files...]",
 	Short: "Sort lines of text files",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		reverse, _ := cmd.Flags().GetBool("reverse")
 		numeric, _ := cmd.Flags().GetBool("numeric-sort")
 		unique, _ := cmd.Flags().GetBool("unique")
 
-		// Expand glob patterns in file argument
-		expandedFiles, err := utils.ExpandGlobsForReading(args)
+		allLines, err := utils.ReadLinesFromFilesOrStdin(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "sort: %v\n", err)
 			return
-		}
-
-		var allLines []string
-		for _, path := range expandedFiles {
-			file, err := os.Open(path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "sort: %v\n", err)
-				continue
-			}
-			defer file.Close()
-
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				allLines = append(allLines, scanner.Text())
-			}
-
-			if err := scanner.Err(); err != nil {
-				fmt.Fprintf(os.Stderr, "sort: reading input: %v\n", err)
-				return
-			}
 		}
 
 		if numeric {

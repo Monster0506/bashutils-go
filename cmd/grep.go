@@ -13,7 +13,7 @@ import (
 var grepCmd = &cobra.Command{
 	Use:   "grep [pattern] [files...]",
 	Short: "Print lines matching a pattern",
-	Args:  cobra.MinimumNArgs(2),
+	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		patternStr := args[0]
 		filePath := args[1]
@@ -34,6 +34,23 @@ var grepCmd = &cobra.Command{
 		re, err := regexp.Compile(patternStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "grep: invalid regex pattern: %v\n", err)
+			return
+		}
+
+		if len(args) < 2 {
+			// Read from stdin when no files provided
+			scanner := bufio.NewScanner(os.Stdin)
+			for scanner.Scan() {
+				line := scanner.Text()
+				match := re.MatchString(line)
+				if (match && !invertMatch) || (!match && invertMatch) {
+					if lineNumber {
+						fmt.Printf("%d:%s\n", 0, line)
+					} else {
+						fmt.Println(line)
+					}
+				}
+			}
 			return
 		}
 

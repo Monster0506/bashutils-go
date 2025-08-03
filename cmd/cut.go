@@ -14,7 +14,7 @@ import (
 var cutCmd = &cobra.Command{
 	Use:   "cut [files...]",
 	Short: "Extract specific columns or byte ranges from lines",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		fields, _ := cmd.Flags().GetString("fields")
 		delimiter, _ := cmd.Flags().GetString("delimiter")
@@ -25,22 +25,9 @@ var cutCmd = &cobra.Command{
 			return
 		}
 
-		// Expand glob patterns in file argument
-		expandedFiles, err := utils.ExpandGlobsForReading(args)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "cut: %v\n", err)
-			return
-		}
-
-		for _, path := range expandedFiles {
-			file, err := os.Open(path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "cut: %v\n", err)
-				continue
-			}
-			defer file.Close()
-
-			scanner := bufio.NewScanner(file)
+		if len(args) == 0 {
+			// Read from stdin when no files provided
+			scanner := bufio.NewScanner(os.Stdin)
 			for scanner.Scan() {
 				line := scanner.Text()
 				if fields != "" {
@@ -49,9 +36,35 @@ var cutCmd = &cobra.Command{
 					printCharacters(line, characters)
 				}
 			}
+		} else {
+			// Expand glob patterns in file argument
+			expandedFiles, err := utils.ExpandGlobsForReading(args)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "cut: %v\n", err)
+				return
+			}
 
-			if err := scanner.Err(); err != nil {
-				fmt.Fprintf(os.Stderr, "cut: reading input: %v\n", err)
+			for _, path := range expandedFiles {
+				file, err := os.Open(path)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "cut: %v\n", err)
+					continue
+				}
+				defer file.Close()
+
+				scanner := bufio.NewScanner(file)
+				for scanner.Scan() {
+					line := scanner.Text()
+					if fields != "" {
+						printFields(line, delimiter, fields)
+					} else if characters != "" {
+						printCharacters(line, characters)
+					}
+				}
+
+				if err := scanner.Err(); err != nil {
+					fmt.Fprintf(os.Stderr, "cut: reading input: %v\n", err)
+				}
 			}
 		}
 	},
