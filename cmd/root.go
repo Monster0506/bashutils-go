@@ -32,4 +32,5 @@ func init() {
 	rootCmd.AddCommand(trCmd)
 	rootCmd.AddCommand(pasteCmd)
 	rootCmd.AddCommand(splitCmd)
+	rootCmd.AddCommand(xargsCmd)
 }
