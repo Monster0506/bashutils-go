@@ -35,8 +35,7 @@ counterpart, with a focus on simplicity and portability.
 *   **Bash-like Path Globbing**: All file-operating commands support bash-style
     glob patterns (`*`, `?`, `[...]`).
 *   **Core Utilities**: Implements common Unix utilities like `cat`, `head`,
-    `tail`, `wc`, `grep`, `sort`, `uniq`, `cut`, `paste`, `split`, `tr`, and
-    `echo`.
+    `tail`, `wc`, `grep`, `sort`, `uniq`, `cut`, `paste`, `split`, `tr`, `echo`, and `xargs`.
 
 Currently supported commands:
 
@@ -52,6 +51,7 @@ Currently supported commands:
 *   **`tr`**: Translate or delete characters.
 *   **`uniq`**: Report or omit repeated lines.
 *   **`wc`**: Print newline, word, and byte counts for each file.
+*   **`xargs`**: Build and execute command lines from standard input.
 
 ## Globbing Support
 
@@ -308,6 +308,28 @@ bashutils wc -wc "reports/*.txt"
 
 # Get all counts for all files in the current directory
 bashutils wc "*"
+```
+
+### `xargs`
+
+Build and execute command lines from standard input. Useful for processing lists
+of files or arguments from other commands.
+
+```bash
+# Count lines in all Python files
+git ls-files | bashutils xargs bashutils wc -l
+
+# Find all text files and count their words
+find . -name "*.txt" | bashutils xargs bashutils wc -w
+
+# Process files in batches of 10
+echo "file1.txt file2.txt file3.txt" | bashutils xargs -n 10 bashutils cat
+
+# Use a custom delimiter (comma-separated values)
+echo "file1.txt,file2.txt,file3.txt" | bashutils xargs -d ',' bashutils wc -l
+
+# Replace placeholder in command
+echo "file1.txt file2.txt" | bashutils xargs -I {} bashutils echo "Processing: {}"
 ```
 
 ## Contributing
