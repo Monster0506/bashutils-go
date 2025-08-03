@@ -33,18 +33,55 @@ var uniqCmd = &cobra.Command{
 			return
 		}
 
+		// First pass: collect all counts to determine column width
+		var allCounts []struct {
+			line  string
+			count int
+		}
+		var maxCountWidth int
+
 		currentLine := allLines[0]
 		currentCount := 1
 		for i := 1; i < len(allLines); i++ {
 			if allLines[i] == currentLine {
 				currentCount++
 			} else {
-				printUniqLine(currentLine, currentCount, count, repeated, unique)
+				if shouldPrintLine(currentCount, repeated, unique) {
+					allCounts = append(allCounts, struct {
+						line  string
+						count int
+					}{currentLine, currentCount})
+					
+					countStr := fmt.Sprintf("%d", currentCount)
+					if len(countStr) > maxCountWidth {
+						maxCountWidth = len(countStr)
+					}
+				}
 				currentLine = allLines[i]
 				currentCount = 1
 			}
 		}
-		printUniqLine(currentLine, currentCount, count, repeated, unique)
+		// Don't forget the last group
+		if shouldPrintLine(currentCount, repeated, unique) {
+			allCounts = append(allCounts, struct {
+				line  string
+				count int
+			}{currentLine, currentCount})
+			
+			countStr := fmt.Sprintf("%d", currentCount)
+			if len(countStr) > maxCountWidth {
+				maxCountWidth = len(countStr)
+			}
+		}
+
+		// Second pass: print with proper alignment
+		for _, item := range allCounts {
+			if count {
+				fmt.Printf("%*d %s\n", maxCountWidth, item.count, item.line)
+			} else {
+				fmt.Println(item.line)
+			}
+		}
 	},
 }
 
@@ -54,17 +91,12 @@ func init() {
 	uniqCmd.Flags().BoolP("unique", "u", false, "print only unique lines (non-repeated)")
 }
 
-func printUniqLine(line string, count int, showCount, showRepeated, showUnique bool) {
+func shouldPrintLine(count int, showRepeated, showUnique bool) bool {
 	if showRepeated && count == 1 {
-		return // Skip unique lines if only repeated are requested
+		return false // Skip unique lines if only repeated are requested
 	}
 	if showUnique && count > 1 {
-		return // Skip repeated lines if only unique are requested
+		return false // Skip repeated lines if only unique are requested
 	}
-
-	if showCount {
-		fmt.Printf("%d %s\n", count, line)
-	} else {
-		fmt.Println(line)
-	}
+	return true
 }
