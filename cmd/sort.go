@@ -19,6 +19,7 @@ var sortCmd = &cobra.Command{
 		numeric, _ := cmd.Flags().GetBool("numeric-sort")
 		unique, _ := cmd.Flags().GetBool("unique")
 		column, _ := cmd.Flags().GetInt("key")
+		separator, _ := cmd.Flags().GetString("field-separator")
 
 		allLines, err := utils.ReadLinesFromFilesOrStdin(args)
 		if err != nil {
@@ -30,8 +31,14 @@ var sortCmd = &cobra.Command{
 			var keyI, keyJ string
 
 			if column > 0 {
-				columnsI := strings.Fields(allLines[i])
-				columnsJ := strings.Fields(allLines[j])
+				var columnsI, columnsJ []string
+				if separator != "" {
+					columnsI = strings.Split(allLines[i], separator)
+					columnsJ = strings.Split(allLines[j], separator)
+				} else {
+					columnsI = strings.Fields(allLines[i])
+					columnsJ = strings.Fields(allLines[j])
+				}
 
 				if column <= len(columnsI) {
 					keyI = columnsI[column-1]
@@ -93,4 +100,5 @@ func init() {
 	sortCmd.Flags().BoolP("numeric-sort", "n", false, "compare according to string numerical value")
 	sortCmd.Flags().BoolP("unique", "u", false, "output only the first of an equal run")
 	sortCmd.Flags().IntP("key", "k", 0, "sort by the specified column (1-based index)")
+	sortCmd.Flags().StringP("field-separator", "t", "", "use specified character as field separator")
 }
