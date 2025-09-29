@@ -2,20 +2,23 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/monster0506/bashutils-go/internal/utils"
-	"github.com/spf13/cobra"
 	"os"
 	"strings"
+	"unicode"
+
+	"github.com/monster0506/bashutils-go/internal/utils"
+	"github.com/spf13/cobra"
 )
 
 var wcCmd = &cobra.Command{
 	Use:   "wc [files...]",
-	Short: "Print newline, word, and byte counts for each file",
+	Short: "Print newline, word, byte, and char counts for each file",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		showLines, _ := cmd.Flags().GetBool("lines")
 		showWords, _ := cmd.Flags().GetBool("words")
 		showBytes, _ := cmd.Flags().GetBool("bytes")
+		showChars, _ := cmd.Flags().GetBool("chars")
 
 		// Expand glob patterns in arguments
 		expandedArgs, err := utils.ExpandGlobsForReading(args)
@@ -24,14 +27,14 @@ var wcCmd = &cobra.Command{
 			return
 		}
 
-		var totalLines, totalWords, totalBytes int
+		var totalLines, totalWords, totalBytes, totalChars int
 		var validFiles []string
 		var allCounts []struct {
-			lines, words, bytes int
-			path                string
+			lines, words, bytes, chars int
+			path                       string
 		}
 
-		// First pass: collect all counts to determine column widths
+		// First pass: collect all counts
 		for _, path := range expandedArgs {
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -39,106 +42,119 @@ var wcCmd = &cobra.Command{
 				continue
 			}
 			validFiles = append(validFiles, path)
-			
+
 			content := string(data)
 			lines := strings.Count(content, "\n")
 			words := len(strings.Fields(content))
 			bytes := len(data)
 
+			// Count **non-whitespace characters**
+			chars := 0
+			for _, r := range content {
+				if !unicode.IsSpace(r) {
+					chars++
+				}
+			}
+
 			totalLines += lines
 			totalWords += words
 			totalBytes += bytes
+			totalChars += chars
 
 			allCounts = append(allCounts, struct {
-				lines, words, bytes int
-				path                string
-			}{lines, words, bytes, path})
+				lines, words, bytes, chars int
+				path                       string
+			}{lines, words, bytes, chars, path})
 		}
 
-		// Determine column widths
+		// Determine column widths (for alignment)
 		maxLinesWidth := 1
 		maxWordsWidth := 1
 		maxBytesWidth := 1
-		maxTotalLinesWidth := 1
-		maxTotalWordsWidth := 1
-		maxTotalBytesWidth := 1
+		maxCharsWidth := 1
 
 		for _, count := range allCounts {
-			linesStr := fmt.Sprintf("%d", count.lines)
-			wordsStr := fmt.Sprintf("%d", count.words)
-			bytesStr := fmt.Sprintf("%d", count.bytes)
-			
-			if len(linesStr) > maxLinesWidth {
-				maxLinesWidth = len(linesStr)
+			if len(fmt.Sprintf("%d", count.lines)) > maxLinesWidth {
+				maxLinesWidth = len(fmt.Sprintf("%d", count.lines))
 			}
-			if len(wordsStr) > maxWordsWidth {
-				maxWordsWidth = len(wordsStr)
+			if len(fmt.Sprintf("%d", count.words)) > maxWordsWidth {
+				maxWordsWidth = len(fmt.Sprintf("%d", count.words))
 			}
-			if len(bytesStr) > maxBytesWidth {
-				maxBytesWidth = len(bytesStr)
+			if len(fmt.Sprintf("%d", count.bytes)) > maxBytesWidth {
+				maxBytesWidth = len(fmt.Sprintf("%d", count.bytes))
+			}
+			if len(fmt.Sprintf("%d", count.chars)) > maxCharsWidth {
+				maxCharsWidth = len(fmt.Sprintf("%d", count.chars))
 			}
 		}
 
-		totalLinesStr := fmt.Sprintf("%d", totalLines)
-		totalWordsStr := fmt.Sprintf("%d", totalWords)
-		totalBytesStr := fmt.Sprintf("%d", totalBytes)
-		
-		if len(totalLinesStr) > maxTotalLinesWidth {
-			maxTotalLinesWidth = len(totalLinesStr)
+		// Same thing for totals
+		if len(fmt.Sprintf("%d", totalLines)) > maxLinesWidth {
+			maxLinesWidth = len(fmt.Sprintf("%d", totalLines))
 		}
-		if len(totalWordsStr) > maxTotalWordsWidth {
-			maxTotalWordsWidth = len(totalWordsStr)
+		if len(fmt.Sprintf("%d", totalWords)) > maxWordsWidth {
+			maxWordsWidth = len(fmt.Sprintf("%d", totalWords))
 		}
-		if len(totalBytesStr) > maxTotalBytesWidth {
-			maxTotalBytesWidth = len(totalBytesStr)
+		if len(fmt.Sprintf("%d", totalBytes)) > maxBytesWidth {
+			maxBytesWidth = len(fmt.Sprintf("%d", totalBytes))
 		}
-
-		linesWidth := maxLinesWidth
-		if maxTotalLinesWidth > linesWidth {
-			linesWidth = maxTotalLinesWidth
-		}
-		wordsWidth := maxWordsWidth
-		if maxTotalWordsWidth > wordsWidth {
-			wordsWidth = maxTotalWordsWidth
-		}
-		bytesWidth := maxBytesWidth
-		if maxTotalBytesWidth > bytesWidth {
-			bytesWidth = maxTotalBytesWidth
+		if len(fmt.Sprintf("%d", totalChars)) > maxCharsWidth {
+			maxCharsWidth = len(fmt.Sprintf("%d", totalChars))
 		}
 
+		// Print per-file stats
 		for _, count := range allCounts {
 			out := []string{}
 			if showLines {
-				out = append(out, fmt.Sprintf("%*d", linesWidth, count.lines))
+				out = append(out, fmt.Sprintf("%*d", maxLinesWidth, count.lines))
 			}
 			if showWords {
-				out = append(out, fmt.Sprintf("%*d", wordsWidth, count.words))
+				out = append(out, fmt.Sprintf("%*d", maxWordsWidth, count.words))
 			}
 			if showBytes {
-				out = append(out, fmt.Sprintf("%*d", bytesWidth, count.bytes))
+				out = append(out, fmt.Sprintf("%*d", maxBytesWidth, count.bytes))
+			}
+			if showChars {
+				out = append(out, fmt.Sprintf("%*d", maxCharsWidth, count.chars))
 			}
 
+			// Default if no flags provided → print all
 			if len(out) == 0 {
-				fmt.Printf("%*d %*d %*d %s\n", linesWidth, count.lines, wordsWidth, count.words, bytesWidth, count.bytes, count.path)
+				fmt.Printf("%*d %*d %*d %*d %s\n",
+					maxLinesWidth, count.lines,
+					maxWordsWidth, count.words,
+					maxBytesWidth, count.bytes,
+					maxCharsWidth, count.chars,
+					count.path,
+				)
 			} else {
 				fmt.Printf("%s %s\n", strings.Join(out, " "), count.path)
 			}
 		}
 
+		// Print totals if multiple files
 		if len(validFiles) > 1 {
 			out := []string{}
 			if showLines {
-				out = append(out, fmt.Sprintf("%*d", linesWidth, totalLines))
+				out = append(out, fmt.Sprintf("%*d", maxLinesWidth, totalLines))
 			}
 			if showWords {
-				out = append(out, fmt.Sprintf("%*d", wordsWidth, totalWords))
+				out = append(out, fmt.Sprintf("%*d", maxWordsWidth, totalWords))
 			}
 			if showBytes {
-				out = append(out, fmt.Sprintf("%*d", bytesWidth, totalBytes))
+				out = append(out, fmt.Sprintf("%*d", maxBytesWidth, totalBytes))
+			}
+			if showChars {
+				out = append(out, fmt.Sprintf("%*d", maxCharsWidth, totalChars))
 			}
 
 			if len(out) == 0 {
-				fmt.Printf("%*d %*d %*d total\n", linesWidth, totalLines, wordsWidth, totalWords, bytesWidth, totalBytes)
+				fmt.Printf("%*d %*d %*d %*d total\n",
+					maxLinesWidth, totalLines,
+					maxWordsWidth, totalWords,
+					maxBytesWidth, totalBytes,
+					maxCharsWidth, totalChars,
+				)
 			} else {
 				fmt.Printf("%s total\n", strings.Join(out, " "))
 			}
@@ -150,4 +166,5 @@ func init() {
 	wcCmd.Flags().BoolP("lines", "l", false, "print newline count")
 	wcCmd.Flags().BoolP("words", "w", false, "print word count")
 	wcCmd.Flags().BoolP("bytes", "c", false, "print byte count")
+	wcCmd.Flags().BoolP("chars", "m", false, "print non-whitespace character count")
 }
