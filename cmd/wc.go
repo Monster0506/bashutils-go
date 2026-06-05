@@ -13,19 +13,12 @@ import (
 var wcCmd = &cobra.Command{
 	Use:   "wc [files...]",
 	Short: "Print newline, word, byte, and char counts for each file",
-	Args:  cobra.MinimumNArgs(1),
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		showLines, _ := cmd.Flags().GetBool("lines")
 		showWords, _ := cmd.Flags().GetBool("words")
 		showBytes, _ := cmd.Flags().GetBool("bytes")
 		showChars, _ := cmd.Flags().GetBool("chars")
-
-		// Expand glob patterns in arguments
-		expandedArgs, err := utils.ExpandGlobsForReading(args)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "wc: %v\n", err)
-			return
-		}
 
 		var totalLines, totalWords, totalBytes, totalChars int
 		var validFiles []string
@@ -34,13 +27,39 @@ var wcCmd = &cobra.Command{
 			path                       string
 		}
 
-		// First pass: collect all counts
-		for _, path := range expandedArgs {
-			data, err := os.ReadFile(path)
+		type fileEntry struct {
+			path string
+			data []byte
+		}
+		var entries []fileEntry
+
+		if len(args) == 0 {
+			data, err := utils.ReadAllFromReader(os.Stdin)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "wc: %v\n", err)
-				continue
+				return
 			}
+			entries = append(entries, fileEntry{"", []byte(data)})
+		} else {
+			expandedArgs, err := utils.ExpandGlobsForReading(args)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "wc: %v\n", err)
+				return
+			}
+			for _, path := range expandedArgs {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "wc: %v\n", err)
+					continue
+				}
+				entries = append(entries, fileEntry{path, data})
+			}
+		}
+
+		// First pass: collect all counts
+		for _, entry := range entries {
+			data := entry.data
+			path := entry.path
 			validFiles = append(validFiles, path)
 
 			content := string(data)
@@ -119,16 +138,20 @@ var wcCmd = &cobra.Command{
 			}
 
 			// Default if no flags provided → print all
+			suffix := ""
+			if count.path != "" {
+				suffix = " " + count.path
+			}
 			if len(out) == 0 {
-				fmt.Printf("%*d %*d %*d %*d %s\n",
+				fmt.Printf("%*d %*d %*d %*d%s\n",
 					maxLinesWidth, count.lines,
 					maxWordsWidth, count.words,
 					maxBytesWidth, count.bytes,
 					maxCharsWidth, count.chars,
-					count.path,
+					suffix,
 				)
 			} else {
-				fmt.Printf("%s %s\n", strings.Join(out, " "), count.path)
+				fmt.Printf("%s%s\n", strings.Join(out, " "), suffix)
 			}
 		}
 
