@@ -15,8 +15,13 @@ var grepCmd = &cobra.Command{
 	Short: "Print lines matching a pattern",
 	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) == 0 {
+			fmt.Fprintf(os.Stderr, "grep: missing pattern\n")
+			return
+		}
+
 		patternStr := args[0]
-		filePath := args[1]
+		fileArgs := args[1:]
 
 		ignoreCase, _ := cmd.Flags().GetBool("ignore-case")
 		invertMatch, _ := cmd.Flags().GetBool("invert-match")
@@ -28,7 +33,7 @@ var grepCmd = &cobra.Command{
 		}
 
 		if ignoreCase {
-			patternStr = "(?i)" + patternStr // Add case-insensitive flag to regex
+			patternStr = "(?i)" + patternStr
 		}
 
 		re, err := regexp.Compile(patternStr)
@@ -37,15 +42,16 @@ var grepCmd = &cobra.Command{
 			return
 		}
 
-		if len(args) < 2 {
-			// Read from stdin when no files provided
+		if len(fileArgs) == 0 {
 			scanner := bufio.NewScanner(os.Stdin)
+			lineNum := 0
 			for scanner.Scan() {
+				lineNum++
 				line := scanner.Text()
 				match := re.MatchString(line)
 				if (match && !invertMatch) || (!match && invertMatch) {
 					if lineNumber {
-						fmt.Printf("%d:%s\n", 0, line)
+						fmt.Printf("%d:%s\n", lineNum, line)
 					} else {
 						fmt.Println(line)
 					}
@@ -54,8 +60,7 @@ var grepCmd = &cobra.Command{
 			return
 		}
 
-		// Expand glob patterns in file argument
-		expandedFiles, err := utils.ExpandGlobsForReading([]string{filePath})
+		expandedFiles, err := utils.ExpandGlobsForReading(fileArgs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "grep: %v\n", err)
 			return
