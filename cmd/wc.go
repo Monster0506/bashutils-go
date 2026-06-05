@@ -137,7 +137,7 @@ var wcCmd = &cobra.Command{
 				out = append(out, fmt.Sprintf("%*d", maxCharsWidth, count.chars))
 			}
 
-			// Default if no flags provided → print all
+			// Default if no flags provided: print all
 			suffix := ""
 			if count.path != "" {
 				suffix = " " + count.path

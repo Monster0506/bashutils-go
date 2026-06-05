@@ -23,7 +23,7 @@ If only the year is given, the full year is displayed.`,
 		year := now.Year()
 
 		if len(args) == 1 {
-			// One arg → full year
+			// One arg: full year
 			y, err := strconv.Atoi(args[0])
 			if err != nil || y < 1 {
 				fmt.Fprintf(os.Stderr, "cal: invalid year: %s\n", args[0])
@@ -34,7 +34,7 @@ If only the year is given, the full year is displayed.`,
 		}
 
 		if len(args) == 2 {
-			// Two args → month + year
+			// Two args: month + year
 			m, err1 := strconv.Atoi(args[0])
 			y, err2 := strconv.Atoi(args[1])
 			if err1 != nil || err2 != nil || m < 1 || m > 12 || y < 1 {

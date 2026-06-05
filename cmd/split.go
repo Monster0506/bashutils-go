@@ -6,7 +6,6 @@ import (
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -23,38 +22,40 @@ var splitCmd = &cobra.Command{
 		numericSuffixes, _ := cmd.Flags().GetBool("numeric-suffixes")
 
 		filePath := args[0]
-		prefix := "x" // Default prefix
+		prefix := "x"
 		if len(args) > 1 {
 			prefix = args[1]
 		}
 
 		if linesPerFile == 0 && bytesPerFile == "" {
-			linesPerFile = 1000 // Default to 1000 lines if no flag specified
+			linesPerFile = 1000
 		}
 		if linesPerFile > 0 && bytesPerFile != "" {
 			fmt.Fprintf(os.Stderr, "split: cannot split by lines and bytes simultaneously\n")
 			return
 		}
 
-		// Expand glob patterns in file argument
-		expandedFiles, err := utils.ExpandGlobsForReading([]string{filePath})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "split: %v\n", err)
-			return
+		var inputFile *os.File
+		if filePath == "-" {
+			inputFile = os.Stdin
+		} else {
+			expandedFiles, err := utils.ExpandGlobsForReading([]string{filePath})
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "split: %v\n", err)
+				return
+			}
+			if len(expandedFiles) == 0 {
+				fmt.Fprintf(os.Stderr, "split: no matching files found\n")
+				return
+			}
+			f, err := os.Open(expandedFiles[0])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "split: %v\n", err)
+				return
+			}
+			defer f.Close()
+			inputFile = f
 		}
-
-		// For split, we only process the first file if multiple files match
-		if len(expandedFiles) == 0 {
-			fmt.Fprintf(os.Stderr, "split: no matching files found\n")
-			return
-		}
-
-		inputFile, err := os.Open(expandedFiles[0])
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "split: %v\n", err)
-			return
-		}
-		defer inputFile.Close()
 
 		if linesPerFile > 0 {
 			splitByLines(inputFile, prefix, linesPerFile, numericSuffixes)
@@ -103,7 +104,7 @@ func splitByLines(inputFile *os.File, prefix string, linesPerFile int64, numeric
 				outputFile.Close()
 			}
 			suffix := generateSuffix(fileIndex, numericSuffixes)
-			outputFileName := filepath.Join(filepath.Dir(inputFile.Name()), prefix+suffix)
+			outputFileName := prefix + suffix
 			outputFile, err = os.Create(outputFileName)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "split: creating output file: %v\n", err)
@@ -178,7 +179,7 @@ func splitByBytes(inputFile *os.File, prefix string, bytesPerFileStr string, num
 	for {
 		if outputFile == nil {
 			suffix := generateSuffix(fileIndex, numericSuffixes)
-			outputFileName := filepath.Join(filepath.Dir(inputFile.Name()), prefix+suffix)
+			outputFileName := prefix + suffix
 			outputFile, err = os.Create(outputFileName)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "split: creating output file: %v\n", err)
