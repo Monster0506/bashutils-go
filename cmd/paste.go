@@ -13,12 +13,12 @@ import (
 var pasteCmd = &cobra.Command{
 	Use:   "paste [files...]",
 	Short: "Merge lines from files",
-	Args:  cobra.MinimumNArgs(1),
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		delimitersStr, _ := cmd.Flags().GetString("delimiters")
 		serial, _ := cmd.Flags().GetBool("serial")
 
-		delimiters := []rune{'\t'} // Default delimiter
+		delimiters := []rune{'\t'}
 		if delimitersStr != "" {
 			delimiters = []rune(delimitersStr)
 		}
@@ -29,16 +29,33 @@ var pasteCmd = &cobra.Command{
 			return
 		}
 
-		// Expand glob patterns in file arguments
-		expandedArgs, err := utils.ExpandGlobsForReading(args)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "paste: %v\n", err)
-			return
+		if len(args) == 0 {
+			args = []string{"-"}
+		}
+
+		// Expand glob patterns, but preserve "-" entries
+		var expandedArgs []string
+		for _, arg := range args {
+			if arg == "-" {
+				expandedArgs = append(expandedArgs, "-")
+				continue
+			}
+			expanded, err := utils.ExpandGlobsForReading([]string{arg})
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "paste: %v\n", err)
+				return
+			}
+			expandedArgs = append(expandedArgs, expanded...)
 		}
 
 		files := make([]*os.File, len(expandedArgs))
 		scanners := make([]*bufio.Scanner, len(expandedArgs))
 		for i, filePath := range expandedArgs {
+			if filePath == "-" {
+				files[i] = nil
+				scanners[i] = bufio.NewScanner(os.Stdin)
+				continue
+			}
 			file, err := os.Open(filePath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "paste: %v\n", err)
