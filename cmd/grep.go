@@ -15,21 +15,24 @@ var grepCmd = &cobra.Command{
 	Short: "Print lines matching a pattern",
 	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			fmt.Fprintf(os.Stderr, "grep: missing pattern\n")
-			return
-		}
-
-		patternStr := args[0]
-		fileArgs := args[1:]
-
 		ignoreCase, _ := cmd.Flags().GetBool("ignore-case")
 		invertMatch, _ := cmd.Flags().GetBool("invert-match")
 		lineNumber, _ := cmd.Flags().GetBool("line-number")
 		regexpFlag, _ := cmd.Flags().GetString("regexp")
 
+		var patternStr string
+		var fileArgs []string
+
 		if regexpFlag != "" {
 			patternStr = regexpFlag
+			fileArgs = args
+		} else {
+			if len(args) == 0 {
+				fmt.Fprintf(os.Stderr, "grep: missing pattern\n")
+				os.Exit(2)
+			}
+			patternStr = args[0]
+			fileArgs = args[1:]
 		}
 
 		if ignoreCase {
@@ -39,7 +42,18 @@ var grepCmd = &cobra.Command{
 		re, err := regexp.Compile(patternStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "grep: invalid regex pattern: %v\n", err)
-			return
+			os.Exit(2)
+		}
+
+		matched := false
+		exitErr := false
+
+		printLine := func(lineNum int, line string) {
+			if lineNumber {
+				fmt.Printf("%d:%s\n", lineNum, line)
+			} else {
+				fmt.Println(line)
+			}
 		}
 
 		if len(fileArgs) == 0 {
@@ -50,57 +64,58 @@ var grepCmd = &cobra.Command{
 				line := scanner.Text()
 				match := re.MatchString(line)
 				if (match && !invertMatch) || (!match && invertMatch) {
-					if lineNumber {
-						fmt.Printf("%d:%s\n", lineNum, line)
-					} else {
-						fmt.Println(line)
-					}
+					matched = true
+					printLine(lineNum, line)
 				}
 			}
-			return
-		}
-
-		expandedFiles, err := utils.ExpandGlobsForReading(fileArgs)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "grep: %v\n", err)
-			return
-		}
-
-		for _, path := range expandedFiles {
-			if len(expandedFiles) > 1 {
-				fmt.Printf("==> %s <==\n", path)
-			}
-
-			file, err := os.Open(path)
+		} else {
+			expandedFiles, err := utils.ExpandGlobs(fileArgs)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "grep: %v\n", err)
-				continue
+				os.Exit(2)
 			}
-			defer file.Close()
 
-			scanner := bufio.NewScanner(file)
-			lineNum := 0
-			for scanner.Scan() {
-				lineNum++
-				line := scanner.Text()
-				match := re.MatchString(line)
+			for _, path := range expandedFiles {
+				if len(expandedFiles) > 1 {
+					fmt.Printf("==> %s <==\n", path)
+				}
 
-				if (match && !invertMatch) || (!match && invertMatch) {
-					if lineNumber {
-						fmt.Printf("%d:%s\n", lineNum, line)
-					} else {
-						fmt.Println(line)
+				file, err := os.Open(path)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "grep: %v\n", err)
+					exitErr = true
+					continue
+				}
+				defer file.Close()
+
+				scanner := bufio.NewScanner(file)
+				lineNum := 0
+				for scanner.Scan() {
+					lineNum++
+					line := scanner.Text()
+					match := re.MatchString(line)
+					if (match && !invertMatch) || (!match && invertMatch) {
+						matched = true
+						printLine(lineNum, line)
 					}
 				}
-			}
 
-			if err := scanner.Err(); err != nil {
-				fmt.Fprintf(os.Stderr, "grep: reading input: %v\n", err)
-			}
+				if err := scanner.Err(); err != nil {
+					fmt.Fprintf(os.Stderr, "grep: reading input: %v\n", err)
+					exitErr = true
+				}
 
-			if len(expandedFiles) > 1 && path != expandedFiles[len(expandedFiles)-1] {
-				fmt.Println()
+				if len(expandedFiles) > 1 && path != expandedFiles[len(expandedFiles)-1] {
+					fmt.Println()
+				}
 			}
+		}
+
+		if exitErr {
+			os.Exit(2)
+		}
+		if !matched {
+			os.Exit(1)
 		}
 	},
 }
