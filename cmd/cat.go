@@ -12,27 +12,34 @@ import (
 var catCmd = &cobra.Command{
 	Use:   "cat [file]",
 	Short: "Concatenate and display files",
-	Args:  cobra.MinimumNArgs(1),
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Expand glob patterns in arguments
+		if len(args) == 0 {
+			if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
+				fmt.Fprintf(os.Stderr, "cat: %v\n", err)
+			}
+			return
+		}
+
 		expandedArgs, err := utils.ExpandGlobsForReading(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cat: %v\n", err)
 			return
 		}
-		
+
 		for _, path := range expandedArgs {
+			if path == "-" {
+				if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
+					fmt.Fprintf(os.Stderr, "cat: %v\n", err)
+				}
+				continue
+			}
 			data, err := os.ReadFile(path)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "cat: %v\n", err)
 				continue
 			}
-			func() (n int, err error) {
-				if sw, ok := io.Writer(os.Stdout).(io.StringWriter); ok {
-					return sw.WriteString(string(data))
-				}
-				return io.Writer(os.Stdout).Write([]byte(string(data)))
-			}()
+			os.Stdout.Write(data)
 		}
 	},
 }
