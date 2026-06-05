@@ -18,11 +18,11 @@ var echoCmd = &cobra.Command{
 		expandEnv, _ := cmd.Flags().GetBool("expand-env")
 
 		out := strings.Join(args, " ")
-		
+
 		if expandEnv {
 			out = utils.ExpandEnvironmentVariables(out)
 		}
-		
+
 		if enableEscape {
 			out = strings.ReplaceAll(out, "\\n", "\n")
 			out = strings.ReplaceAll(out, "\\t", "\t")

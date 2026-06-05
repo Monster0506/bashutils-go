@@ -13,7 +13,7 @@ import (
 var wcCmd = &cobra.Command{
 	Use:   "wc [files...]",
 	Short: "Print newline, word, byte, and char counts for each file",
-	Args: cobra.ArbitraryArgs,
+	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		showLines, _ := cmd.Flags().GetBool("lines")
 		showWords, _ := cmd.Flags().GetBool("words")

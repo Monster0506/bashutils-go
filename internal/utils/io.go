@@ -12,13 +12,13 @@ func ReadAllFromFilesOrStdin(files []string) (string, error) {
 	if len(files) == 0 {
 		return ReadAllFromReader(os.Stdin)
 	}
-	
+
 	// Expand glob patterns in file arguments
 	expandedFiles, err := ExpandGlobsForReading(files)
 	if err != nil {
 		return "", err
 	}
-	
+
 	var sb strings.Builder
 	for _, f := range expandedFiles {
 		file, err := os.Open(f)
@@ -59,28 +59,28 @@ func ReadLinesFromFilesOrStdin(files []string) ([]string, error) {
 		// Read from stdin when no files provided
 		return ReadLines(os.Stdin)
 	}
-	
+
 	// Expand glob patterns in file arguments
 	expandedFiles, err := ExpandGlobsForReading(files)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var allLines []string
 	for _, path := range expandedFiles {
 		file, err := os.Open(path)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", path, err)
 		}
-		
+
 		lines, err := ReadLines(file)
 		file.Close()
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", path, err)
 		}
-		
+
 		allLines = append(allLines, lines...)
 	}
-	
+
 	return allLines, nil
 }

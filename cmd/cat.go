@@ -12,7 +12,7 @@ import (
 var catCmd = &cobra.Command{
 	Use:   "cat [file]",
 	Short: "Concatenate and display files",
-	Args: cobra.ArbitraryArgs,
+	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {

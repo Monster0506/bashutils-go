@@ -51,7 +51,7 @@ var uniqCmd = &cobra.Command{
 						line  string
 						count int
 					}{currentLine, currentCount})
-					
+
 					countStr := fmt.Sprintf("%d", currentCount)
 					if len(countStr) > maxCountWidth {
 						maxCountWidth = len(countStr)
@@ -67,7 +67,7 @@ var uniqCmd = &cobra.Command{
 				line  string
 				count int
 			}{currentLine, currentCount})
-			
+
 			countStr := fmt.Sprintf("%d", currentCount)
 			if len(countStr) > maxCountWidth {
 				maxCountWidth = len(countStr)

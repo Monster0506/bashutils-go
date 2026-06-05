@@ -18,7 +18,7 @@ var xargsCmd = &cobra.Command{
 with double or single quotes or a backslash) or newlines, and executes the command
 (default is /bin/echo) one or more times with any initial-arguments followed by
 items read from standard input.`,
-	Args: cobra.ArbitraryArgs,
+	Args:               cobra.ArbitraryArgs,
 	DisableFlagParsing: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Parse flags manually since we disabled flag parsing
@@ -28,11 +28,11 @@ items read from standard input.`,
 		delimiter := ""
 		noRunIfEmpty := false
 		verbose := false
-		
+
 		// Parse xargs flags from the beginning of args
 		var commandArgs []string
 		commandFound := false
-		
+
 		// First pass: check for verbose flag
 		for i := 0; i < len(args); i++ {
 			if args[i] == "-t" || args[i] == "--verbose" {
@@ -40,7 +40,7 @@ items read from standard input.`,
 				break
 			}
 		}
-		
+
 		if verbose {
 			fmt.Fprintf(os.Stderr, "Parsing args: %v\n", args)
 		}

@@ -14,7 +14,7 @@ var tailCmd = &cobra.Command{
 	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		n, _ := cmd.Flags().GetInt("lines")
-		
+
 		if len(args) == 0 {
 			// Read from stdin when no files provided
 			scanner := bufio.NewScanner(os.Stdin)
@@ -35,12 +35,12 @@ var tailCmd = &cobra.Command{
 				fmt.Fprintf(os.Stderr, "tail: %v\n", err)
 				return
 			}
-			
+
 			for _, path := range expandedArgs {
 				if len(expandedArgs) > 1 {
 					fmt.Printf("==> %s <==\n", path)
 				}
-				
+
 				f, err := os.Open(path)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "tail: %v\n", err)
@@ -58,7 +58,7 @@ var tailCmd = &cobra.Command{
 				for _, line := range lines {
 					fmt.Println(line)
 				}
-				
+
 				if len(expandedArgs) > 1 && path != expandedArgs[len(expandedArgs)-1] {
 					fmt.Println()
 				}

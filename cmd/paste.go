@@ -13,7 +13,7 @@ import (
 var pasteCmd = &cobra.Command{
 	Use:   "paste [files...]",
 	Short: "Merge lines from files",
-	Args: cobra.ArbitraryArgs,
+	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		delimitersStr, _ := cmd.Flags().GetString("delimiters")
 		serial, _ := cmd.Flags().GetBool("serial")

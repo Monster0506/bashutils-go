@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
-	"regexp"
 )
 
 // ExpandGlobs takes a slice of arguments and expands any glob patterns
 // into matching file paths. It returns a new slice with globs expanded.
 func ExpandGlobs(args []string) ([]string, error) {
 	var expanded []string
-	
+
 	for _, arg := range args {
 		// Check if the argument contains any glob characters
 		if containsGlobChars(arg) {
@@ -21,13 +21,13 @@ func ExpandGlobs(args []string) ([]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("glob error for pattern %s: %v", arg, err)
 			}
-			
+
 			// If no matches found, keep the original pattern (bash behavior)
 			if len(matches) == 0 {
 				expanded = append(expanded, arg)
 				continue
 			}
-			
+
 			// Sort matches for consistent output
 			sort.Strings(matches)
 			expanded = append(expanded, matches...)
@@ -36,7 +36,7 @@ func ExpandGlobs(args []string) ([]string, error) {
 			expanded = append(expanded, arg)
 		}
 	}
-	
+
 	return expanded, nil
 }
 
@@ -52,7 +52,7 @@ func ExpandGlobsWithValidation(args []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var valid []string
 	for _, path := range expanded {
 		if _, err := os.Stat(path); err == nil {
@@ -65,7 +65,7 @@ func ExpandGlobsWithValidation(args []string) ([]string, error) {
 			return nil, fmt.Errorf("error accessing %s: %v", path, err)
 		}
 	}
-	
+
 	return valid, nil
 }
 
@@ -75,7 +75,7 @@ func ExpandGlobsForReading(args []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var readable []string
 	for _, path := range expanded {
 		if file, err := os.Open(path); err == nil {
@@ -89,7 +89,7 @@ func ExpandGlobsForReading(args []string) ([]string, error) {
 			return nil, fmt.Errorf("error accessing %s: %v", path, err)
 		}
 	}
-	
+
 	return readable, nil
 }
 
@@ -116,4 +116,4 @@ func ExpandEnvironmentVariables(input string) string {
 	})
 
 	return result
-} 
+}

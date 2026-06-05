@@ -3,11 +3,11 @@ package cmd
 import (
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
+	"github.com/spf13/cobra"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
-	"github.com/spf13/cobra"
 )
 
 var sortCmd = &cobra.Command{
