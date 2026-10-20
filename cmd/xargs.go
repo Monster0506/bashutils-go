@@ -39,7 +39,13 @@ items read from standard input.`,
 			delimiter = "\n"
 		}
 
-		items, err := readItems(os.Stdin, opts.null, delimiter)
+		src, err := xargsSource(opts.file)
+		if err != nil {
+			return err
+		}
+		defer src.Close()
+
+		batches, err := xargsBatches(src, opts, delimiter)
 		if err != nil {
 			return fail(1, "xargs: error reading input: %v", err)
 		}
@@ -48,20 +54,15 @@ items read from standard input.`,
 			commandArgs = []string{"bashutils", "echo"}
 		}
 
-		if len(items) == 0 {
+		if len(batches) == 0 {
 			if !opts.noRun {
 				executeCommand(commandArgs, nil, opts.replace, opts.verbose)
 			}
 			return nil
 		}
 
-		batch := len(items)
-		if opts.maxArgs > 0 {
-			batch = opts.maxArgs
-		}
-		for i := 0; i < len(items); i += batch {
-			end := min(i+batch, len(items))
-			executeCommand(commandArgs, items[i:end], opts.replace, opts.verbose)
+		for _, batch := range batches {
+			executeCommand(commandArgs, batch, opts.replace, opts.verbose)
 		}
 		return nil
 	},
@@ -71,22 +72,28 @@ var errXargsHelp = errors.New("help requested")
 
 type xargsOpts struct {
 	maxArgs   int
+	maxLines  int
 	replace   string
 	null      bool
 	delimiter string
 	noRun     bool
 	verbose   bool
+	file      string
+	eof       string
 }
 
-const xargsValued = "nId"
+const xargsValued = "nIdaLE"
 
 var xargsLong = map[string]rune{
 	"max-args":        'n',
+	"max-lines":       'L',
 	"replace":         'I',
 	"null":            '0',
 	"delimiter":       'd',
 	"no-run-if-empty": 'r',
 	"verbose":         't',
+	"arg-file":        'a',
+	"eof":             'E',
 	"help":            'h',
 }
 
@@ -163,6 +170,16 @@ func (o *xargsOpts) apply(letter rune, value string, hasValue bool, rest []strin
 			return 0, err
 		}
 		o.delimiter = d
+	case 'a':
+		o.file = value
+	case 'L':
+		n, err := strconv.Atoi(value)
+		if err != nil || n <= 0 {
+			return 0, fmt.Errorf("invalid number %q for -L option", value)
+		}
+		o.maxLines = n
+	case 'E':
+		o.eof = value
 	case '0':
 		o.null = true
 	case 'r':
@@ -196,6 +213,85 @@ func readItems(r io.Reader, nullTerminated bool, delimiter string) ([]string, er
 	return items, scanner.Err()
 }
 
+func xargsBatches(r io.Reader, o xargsOpts, delimiter string) ([][]string, error) {
+	if o.maxLines > 0 {
+		return readLineBatches(r, o)
+	}
+
+	items, err := readItems(r, o.null, delimiter)
+	if err != nil {
+		return nil, err
+	}
+	items = cutAtEOF(items, o.eof)
+
+	return chunkItems(items, o.maxArgs), nil
+}
+
+func chunkItems(items []string, size int) [][]string {
+	if len(items) == 0 {
+		return nil
+	}
+	if size <= 0 {
+		size = len(items)
+	}
+
+	var batches [][]string
+	for i := 0; i < len(items); i += size {
+		batches = append(batches, items[i:min(i+size, len(items))])
+	}
+	return batches
+}
+
+func cutAtEOF(items []string, eof string) []string {
+	if eof == "" {
+		return items
+	}
+	for i, item := range items {
+		if item == eof {
+			return items[:i]
+		}
+	}
+	return items
+}
+
+func readLineBatches(r io.Reader, o xargsOpts) ([][]string, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var batches [][]string
+	var current []string
+	linesInBatch := 0
+	for _, line := range strings.Split(string(data), "\n") {
+		items, err := readQuotedItems(strings.NewReader(line))
+		if err != nil {
+			return nil, err
+		}
+
+		stopped := false
+		if trimmed := cutAtEOF(items, o.eof); len(trimmed) < len(items) {
+			items, stopped = trimmed, true
+		}
+		if len(items) > 0 {
+			current = append(current, items...)
+			linesInBatch++
+		}
+		if linesInBatch == o.maxLines || (stopped && len(current) > 0) {
+			batches = append(batches, current)
+			current, linesInBatch = nil, 0
+		}
+		if stopped {
+			return batches, nil
+		}
+	}
+
+	if len(current) > 0 {
+		batches = append(batches, current)
+	}
+	return batches, nil
+}
+
 func splitOnByte(delim byte) bufio.SplitFunc {
 	return func(data []byte, atEOF bool) (int, []byte, error) {
 		if i := bytes.IndexByte(data, delim); i >= 0 {
@@ -206,6 +302,23 @@ func splitOnByte(delim byte) bufio.SplitFunc {
 		}
 		return 0, nil, nil
 	}
+}
+
+func xargsSource(file string) (io.ReadCloser, error) {
+	if file == "" {
+		file = "-"
+	}
+
+	inputs := resolveInputs("xargs", []string{file}, reportErrors)
+	if len(inputs) == 0 {
+		return nil, exitWith(1)
+	}
+
+	r := openInput("xargs", inputs[0], reportErrors)
+	if r == nil {
+		return nil, exitWith(1)
+	}
+	return r, nil
 }
 
 var delimiterArgEscapes = map[string]string{
