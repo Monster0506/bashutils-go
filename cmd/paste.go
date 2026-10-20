@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
@@ -81,10 +80,7 @@ func openScanners(inputs []input) ([]*utils.LineScanner, func(), error) {
 	var stdin *utils.LineScanner
 	scanners := make([]*utils.LineScanner, len(inputs))
 	for i, in := range inputs {
-		if in.name == stdinName {
-			if stdin == nil {
-				stdin = utils.NewScanner(os.Stdin)
-			}
+		if in.name == stdinName && stdin != nil {
 			scanners[i] = stdin
 			continue
 		}
@@ -95,6 +91,9 @@ func openScanners(inputs []input) ([]*utils.LineScanner, func(), error) {
 		}
 		closers = append(closers, f)
 		scanners[i] = utils.NewScanner(f)
+		if in.name == stdinName {
+			stdin = scanners[i]
+		}
 	}
 	return scanners, closeAll, nil
 }
