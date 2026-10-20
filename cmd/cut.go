@@ -108,6 +108,11 @@ func parseRanges(input string) ([]int, error) {
 }
 
 func printFields(line, delimiter, fields string) {
+	if !strings.Contains(line, delimiter) {
+		fmt.Println(line)
+		return
+	}
+
 	parts := strings.Split(line, delimiter)
 	fieldIndices, err := parseRanges(fields)
 	if err != nil {
