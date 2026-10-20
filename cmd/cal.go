@@ -9,160 +9,172 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type weekStart int
+
+const (
+	startSunday weekStart = iota
+	startMonday
+)
+
+const (
+	calWidth     = 20
+	calGap       = "  "
+	calWeekRows  = 6
+	calPerRow    = 3
+	monthsInYear = 12
+)
+
 var calCmd = &cobra.Command{
-	Use:   "cal [month] [year]",
+	Use:   "cal [[month] year]",
 	Short: "Display a calendar",
 	Long: `Display a calendar for a given month and year.
 If no arguments are given, the current month is displayed.
 If only the year is given, the full year is displayed.`,
 	Args: cobra.RangeArgs(0, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		now := time.Now()
-		month := int(now.Month())
-		year := now.Year()
+		monday, _ := cmd.Flags().GetBool("monday")
+		wholeYear, _ := cmd.Flags().GetBool("year")
+		three, _ := cmd.Flags().GetBool("three")
 
-		if len(args) == 1 {
+		ws := startSunday
+		if monday {
+			ws = startMonday
+		}
+
+		now := time.Now()
+		month, year := int(now.Month()), now.Year()
+
+		switch len(args) {
+		case 1:
 			y, err := strconv.Atoi(args[0])
 			if err != nil || y < 1 {
 				return fail(1, "cal: invalid year: %s", args[0])
 			}
-			printYear(y)
-			return nil
-		}
-
-		if len(args) == 2 {
+			year, wholeYear = y, true
+		case 2:
 			m, err1 := strconv.Atoi(args[0])
 			y, err2 := strconv.Atoi(args[1])
-			if err1 != nil || err2 != nil || m < 1 || m > 12 || y < 1 {
+			if err1 != nil || err2 != nil || m < 1 || m > monthsInYear || y < 1 {
 				return fail(1, "cal: invalid date: %s %s", args[0], args[1])
 			}
-			month = m
-			year = y
+			month, year = m, y
 		}
 
-		printMonth(month, year)
+		switch {
+		case three:
+			printThreeMonths(month, year, ws)
+		case wholeYear:
+			printYear(year, ws)
+		default:
+			printBlocks([][]string{monthBlock(month, year, ws)})
+		}
 		return nil
 	},
 }
 
-// printMonth prints a single month calendar
-func printMonth(month, year int) {
-	monthName := time.Month(month).String()
-	fmt.Fprintf(stdout, "     %s %d\n", monthName, year)
-	fmt.Fprintln(stdout, "Su Mo Tu We Th Fr Sa")
+func init() {
+	calCmd.Flags().BoolP("monday", "m", false, "start the week on Monday")
+	calCmd.Flags().BoolP("year", "y", false, "show the whole year")
+	calCmd.Flags().BoolP("three", "3", false, "show the previous, current and next month")
+}
 
-	// First day of the month
-	firstDay := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
-	startWeekday := int(firstDay.Weekday()) // Sunday=0
+func monthBlock(month, year int, ws weekStart) []string {
+	title := fmt.Sprintf("%s %d", time.Month(month), year)
+	pad := max((calWidth-len(title))/2, 0)
 
-	// Days in month
-	daysInMonth := daysIn(month, year)
-
-	// Print leading spaces
-	for i := 0; i < startWeekday; i++ {
-		fmt.Fprint(stdout, "   ")
+	header := "Su Mo Tu We Th Fr Sa"
+	if ws == startMonday {
+		header = "Mo Tu We Th Fr Sa Su"
 	}
 
-	// Print days
-	day := 1
-	for i := startWeekday; day <= daysInMonth; i++ {
-		fmt.Fprintf(stdout, "%2d ", day)
-		if i%7 == 6 {
+	block := []string{strings.Repeat(" ", pad) + title, header}
+
+	offset := int(time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local).Weekday())
+	if ws == startMonday {
+		offset = (offset + 6) % 7
+	}
+
+	cells := make([]string, 0, offset+daysIn(month, year))
+	for i := 0; i < offset; i++ {
+		cells = append(cells, "  ")
+	}
+	for day := 1; day <= daysIn(month, year); day++ {
+		cells = append(cells, fmt.Sprintf("%2d", day))
+	}
+
+	for row := 0; row < calWeekRows; row++ {
+		from := row * 7
+		if from >= len(cells) {
+			block = append(block, "")
+			continue
+		}
+		block = append(block, strings.Join(cells[from:min(from+7, len(cells))], " "))
+	}
+	return block
+}
+
+func printBlocks(blocks [][]string) {
+	rows := 0
+	for _, b := range blocks {
+		rows = max(rows, len(b))
+	}
+
+	var lines []string
+	for r := 0; r < rows; r++ {
+		cols := make([]string, len(blocks))
+		for i, b := range blocks {
+			cell := ""
+			if r < len(b) {
+				cell = b[r]
+			}
+			cols[i] = fmt.Sprintf("%-*s", calWidth, cell)
+		}
+		lines = append(lines, strings.TrimRight(strings.Join(cols, calGap), " "))
+	}
+
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	for _, l := range lines {
+		fmt.Fprintln(stdout, l)
+	}
+}
+
+func printThreeMonths(month, year int, ws weekStart) {
+	var blocks [][]string
+	for delta := -1; delta <= 1; delta++ {
+		t := time.Date(year, time.Month(month+delta), 1, 0, 0, 0, 0, time.Local)
+		blocks = append(blocks, monthBlock(int(t.Month()), t.Year(), ws))
+	}
+	printBlocks(blocks)
+}
+
+func printYear(year int, ws weekStart) {
+	fmt.Fprintf(stdout, "%*d\n\n", (calWidth*calPerRow+len(calGap)*(calPerRow-1)+len(strconv.Itoa(year)))/2, year)
+
+	for first := 1; first <= monthsInYear; first += calPerRow {
+		var blocks [][]string
+		for m := first; m < first+calPerRow; m++ {
+			blocks = append(blocks, monthBlock(m, year, ws))
+		}
+		printBlocks(blocks)
+		if first+calPerRow <= monthsInYear {
 			fmt.Fprintln(stdout)
 		}
-		day++
-	}
-	if (startWeekday+daysInMonth)%7 != 0 {
-		fmt.Fprintln(stdout)
 	}
 }
 
-// printYear prints the full year calendar
-func printYear(year int) {
-	fmt.Fprintf(stdout, "                             %d\n\n", year)
-	for quarter := 0; quarter < 4; quarter++ {
-		// Print month names
-		for m := 1; m <= 3; m++ {
-			month := time.Month(quarter*3 + m)
-			fmt.Fprintf(stdout, "      %-9s", month.String())
-			if m < 3 {
-				fmt.Fprint(stdout, "   ")
-			}
-		}
-		fmt.Fprintln(stdout)
-
-		// Print weekday headers
-		for m := 0; m < 3; m++ {
-			fmt.Fprint(stdout, "Su Mo Tu We Th Fr Sa  ")
-		}
-		fmt.Fprintln(stdout)
-
-		// Prepare month data
-		monthDays := [3][]string{}
-		for m := 0; m < 3; m++ {
-			monthNum := quarter*3 + m + 1
-			monthDays[m] = monthLines(monthNum, year)
-		}
-
-		// Print weeks side by side
-		for week := 0; week < 6; week++ {
-			for m := 0; m < 3; m++ {
-				if week < len(monthDays[m]) {
-					fmt.Fprint(stdout, monthDays[m][week])
-				} else {
-					fmt.Fprint(stdout, strings.Repeat(" ", 20))
-				}
-				if m < 2 {
-					fmt.Fprint(stdout, "  ")
-				}
-			}
-			fmt.Fprintln(stdout)
-		}
-		fmt.Fprintln(stdout)
-	}
-}
-
-// monthLines returns a slice of strings representing each week of a month
-func monthLines(month, year int) []string {
-	lines := []string{}
-	firstDay := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
-	startWeekday := int(firstDay.Weekday())
-	daysInMonth := daysIn(month, year)
-
-	week := strings.Repeat("   ", startWeekday)
-	day := 1
-	for {
-		for i := startWeekday; i < 7 && day <= daysInMonth; i++ {
-			week += fmt.Sprintf("%2d ", day)
-			day++
-		}
-		lines = append(lines, strings.TrimRight(week, " "))
-		if day > daysInMonth {
-			break
-		}
-		week = ""
-		startWeekday = 0
-	}
-	// Pad each line to fixed width
-	for i := range lines {
-		lines[i] = fmt.Sprintf("%-20s", lines[i])
-	}
-	return lines
-}
-
-// daysIn returns the number of days in a given month/year
 func daysIn(month, year int) int {
-	// February leap year check
 	if month == 2 {
-		if (year%4 == 0 && year%100 != 0) || (year%400 == 0) {
+		if (year%4 == 0 && year%100 != 0) || year%400 == 0 {
 			return 29
 		}
 		return 28
 	}
-	// Months with 31 days
-	if month == 1 || month == 3 || month == 5 || month == 7 ||
-		month == 8 || month == 10 || month == 12 {
-		return 31
+
+	switch month {
+	case 4, 6, 9, 11:
+		return 30
 	}
-	return 30
+	return 31
 }
