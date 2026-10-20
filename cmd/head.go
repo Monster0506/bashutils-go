@@ -29,7 +29,7 @@ var headCmd = &cobra.Command{
 				return
 			}
 
-			for _, path := range expandedArgs {
+			for i, path := range expandedArgs {
 				if len(expandedArgs) > 1 {
 					fmt.Printf("==> %s <==\n", path)
 				}
@@ -45,7 +45,7 @@ var headCmd = &cobra.Command{
 					fmt.Println(scanner.Text())
 				}
 
-				if len(expandedArgs) > 1 && path != expandedArgs[len(expandedArgs)-1] {
+				if i < len(expandedArgs)-1 {
 					fmt.Println()
 				}
 			}

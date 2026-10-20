@@ -36,7 +36,7 @@ var tailCmd = &cobra.Command{
 				return
 			}
 
-			for _, path := range expandedArgs {
+			for i, path := range expandedArgs {
 				if len(expandedArgs) > 1 {
 					fmt.Printf("==> %s <==\n", path)
 				}
@@ -59,7 +59,7 @@ var tailCmd = &cobra.Command{
 					fmt.Println(line)
 				}
 
-				if len(expandedArgs) > 1 && path != expandedArgs[len(expandedArgs)-1] {
+				if i < len(expandedArgs)-1 {
 					fmt.Println()
 				}
 			}
