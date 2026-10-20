@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,63 +23,27 @@ items read from standard input.`,
 	Args:               cobra.ArbitraryArgs,
 	DisableFlagParsing: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Parse flags manually since we disabled flag parsing
-		maxArgs := 0
-		replaceStr := ""
-		nullTerminated := false
-		delimiter := ""
-		noRunIfEmpty := false
-		verbose := false
-
-		// Parse xargs flags from the beginning of args
-		var commandArgs []string
-		commandFound := false
-
-		for i := 0; i < len(args) && !commandFound; i++ {
-			arg := args[i]
-			switch arg {
-			case "-n", "--max-args":
-				if i+1 < len(args) {
-					maxArgs = parseInt(args[i+1])
-					i++ // skip the value
-				}
-			case "-I", "--replace":
-				if i+1 < len(args) {
-					replaceStr = args[i+1]
-					i++ // skip the value
-				}
-			case "-0", "--null":
-				nullTerminated = true
-			case "-d", "--delimiter":
-				if i+1 < len(args) {
-					delimiter = args[i+1]
-					i++ // skip the value
-				}
-			case "-r", "--no-run-if-empty":
-				noRunIfEmpty = true
-			case "-t", "--verbose":
-				verbose = true
-			case "-h", "--help":
-				cmd.Help()
-				return
-			default:
-				if strings.HasPrefix(arg, "-") && arg != "-" {
-					fmt.Fprintf(os.Stderr, "xargs: invalid option -- '%s'\n", arg)
-					os.Exit(1)
-				}
-
-				// This is the start of the command - take everything from here
-				commandArgs = args[i:]
-				commandFound = true
-				break
-			}
+		opts, commandArgs, err := parseXargsArgs(args)
+		if errors.Is(err, errXargsHelp) {
+			cmd.Help()
+			return
 		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "xargs: %v\n", err)
+			os.Exit(1)
+		}
+
+		maxArgs := opts.maxArgs
+		replaceStr := opts.replace
+		nullTerminated := opts.null
+		delimiter := opts.delimiter
+		noRunIfEmpty := opts.noRun
+		verbose := opts.verbose
 
 		if replaceStr != "" && !nullTerminated && delimiter == "" {
 			delimiter = "\n"
 		}
 
-		// Read items from stdin
 		items, err := readItemsFromStdin(nullTerminated, delimiter)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "xargs: error reading input: %v\n", err)
@@ -89,34 +54,132 @@ items read from standard input.`,
 			if noRunIfEmpty {
 				return
 			}
-			// If no items and no-run-if-empty is false, still run command once with no args
 			if len(commandArgs) > 0 {
 				executeCommand(commandArgs, nil, replaceStr, verbose)
 			}
 			return
 		}
 
-		// If no command specified, use bashutils echo
 		if len(commandArgs) == 0 {
 			commandArgs = []string{"bashutils", "echo"}
 		}
 
-		// Execute commands
 		if maxArgs > 0 {
-			// Split items into chunks of maxArgs
 			for i := 0; i < len(items); i += maxArgs {
-				end := i + maxArgs
-				if end > len(items) {
-					end = len(items)
-				}
-				chunk := items[i:end]
-				executeCommand(commandArgs, chunk, replaceStr, verbose)
+				end := min(i+maxArgs, len(items))
+				executeCommand(commandArgs, items[i:end], replaceStr, verbose)
 			}
 		} else {
-			// Execute all items at once
 			executeCommand(commandArgs, items, replaceStr, verbose)
 		}
 	},
+}
+
+var errXargsHelp = errors.New("help requested")
+
+type xargsOpts struct {
+	maxArgs   int
+	replace   string
+	null      bool
+	delimiter string
+	noRun     bool
+	verbose   bool
+}
+
+const xargsValued = "nId"
+
+var xargsLong = map[string]rune{
+	"max-args":        'n',
+	"replace":         'I',
+	"null":            '0',
+	"delimiter":       'd',
+	"no-run-if-empty": 'r',
+	"verbose":         't',
+	"help":            'h',
+}
+
+func parseXargsArgs(args []string) (xargsOpts, []string, error) {
+	var o xargsOpts
+	i := 0
+	for ; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			i++
+			break
+		}
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			break
+		}
+
+		if strings.HasPrefix(arg, "--") {
+			name, value, hasValue := strings.Cut(arg[2:], "=")
+			letter, ok := xargsLong[name]
+			if !ok {
+				return o, nil, fmt.Errorf("invalid option -- '%s'", arg)
+			}
+			used, err := o.apply(letter, value, hasValue, args[i+1:])
+			if err != nil {
+				return o, nil, err
+			}
+			i += used
+			continue
+		}
+
+		for j := 1; j < len(arg); j++ {
+			letter := rune(arg[j])
+			if !strings.ContainsRune(xargsValued, letter) {
+				if _, err := o.apply(letter, "", false, nil); err != nil {
+					return o, nil, err
+				}
+				continue
+			}
+
+			used, err := o.apply(letter, arg[j+1:], j+1 < len(arg), args[i+1:])
+			if err != nil {
+				return o, nil, err
+			}
+			i += used
+			break
+		}
+	}
+
+	return o, args[i:], nil
+}
+
+func (o *xargsOpts) apply(letter rune, value string, hasValue bool, rest []string) (int, error) {
+	used := 0
+	if strings.ContainsRune(xargsValued, letter) && !hasValue {
+		if len(rest) == 0 {
+			return 0, fmt.Errorf("option requires an argument -- '%c'", letter)
+		}
+		value = rest[0]
+		used = 1
+	}
+
+	switch letter {
+	case 'n':
+		n, err := strconv.Atoi(value)
+		if err != nil || n <= 0 {
+			return 0, fmt.Errorf("invalid number %q for -n option", value)
+		}
+		o.maxArgs = n
+	case 'I':
+		o.replace = value
+	case 'd':
+		o.delimiter = value
+	case '0':
+		o.null = true
+	case 'r':
+		o.noRun = true
+	case 't':
+		o.verbose = true
+	case 'h':
+		return 0, errXargsHelp
+	default:
+		return 0, fmt.Errorf("invalid option -- '%c'", letter)
+	}
+
+	return used, nil
 }
 
 func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error) {
