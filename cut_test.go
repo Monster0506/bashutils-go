@@ -73,3 +73,35 @@ func TestCutDashReadsStdin(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestCutOptions(t *testing.T) {
+	cases := []struct {
+		in   string
+		args []string
+		want string
+	}{
+		{"abc\na,b\n", []string{"-d", ",", "-f", "2", "-s"}, "b\n"},
+		{"a,b,c\n", []string{"-d", ",", "-f", "2", "--complement"}, "a,c\n"},
+		{"abc\n", []string{"-c", "2", "--complement"}, "ac\n"},
+		{"abcd\n", []string{"-b", "2-3"}, "bc\n"},
+		{"abcd\n", []string{"-b", "3-"}, "cd\n"},
+		{"a,b,c\n", []string{"-d", ",", "-f", "1,3", "--output-delimiter=:"}, "a:c\n"},
+		{"a,b,c\n", []string{"-d", ",", "-f", "1-2", "--output-delimiter", "--"}, "a--b\n"},
+		{"a::b\n", []string{"-d", "::", "-f", "2"}, "b\n"},
+	}
+
+	for _, c := range cases {
+		got := run(t, c.in, append([]string{"cut"}, c.args...)...).stdout
+		if got != c.want {
+			t.Errorf("cut %v: got %q, want %q", c.args, got, c.want)
+		}
+	}
+}
+
+func TestCutRequiresExactlyOneMode(t *testing.T) {
+	for _, args := range [][]string{{"-b", "1", "-c", "1"}, {"-b", "1", "-f", "1"}} {
+		if r := run(t, "a\n", append([]string{"cut"}, args...)...); r.code == 0 {
+			t.Errorf("cut %v: expected failure", args)
+		}
+	}
+}
