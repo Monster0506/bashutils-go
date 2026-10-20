@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
@@ -38,7 +37,7 @@ var catCmd = &cobra.Command{
 		eachInput("cat", args, func(in input, r io.Reader) {
 			var err error
 			if opts.passthrough {
-				_, err = io.Copy(os.Stdout, r)
+				_, err = io.Copy(stdout, r)
 			} else {
 				err = opts.copyLines(r)
 			}
@@ -87,17 +86,17 @@ func (o *catOpts) copyLines(r io.Reader) error {
 
 		if o.numbering == numberAll || (o.numbering == numberNonBlank && !blank) {
 			o.lineNumber++
-			fmt.Printf("%6d\t", o.lineNumber)
+			fmt.Fprintf(stdout, "%6d\t", o.lineNumber)
 		}
 		if o.showTabs {
 			text = strings.ReplaceAll(text, "\t", "^I")
 		}
-		fmt.Print(text)
+		fmt.Fprint(stdout, text)
 		if o.showEnds && !scanner.Unterminated() {
-			fmt.Print("$")
+			fmt.Fprint(stdout, "$")
 		}
 		if !scanner.Unterminated() {
-			fmt.Println()
+			fmt.Fprintln(stdout)
 		}
 	}
 	return scanner.Err()

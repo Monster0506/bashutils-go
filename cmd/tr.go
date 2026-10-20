@@ -122,7 +122,7 @@ func (t *translator) run(r io.Reader) error {
 			continue
 		}
 
-		fmt.Print(string(out))
+		fmt.Fprint(stdout, string(out))
 		t.last, t.haveLast = out, true
 	}
 }

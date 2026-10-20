@@ -107,7 +107,7 @@ func printCounts(counts []wcCount, selected []string) {
 		if row.label != "" {
 			cells = append(cells, row.label)
 		}
-		fmt.Println(strings.Join(cells, " "))
+		fmt.Fprintln(stdout, strings.Join(cells, " "))
 	}
 }
 

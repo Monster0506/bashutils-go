@@ -294,7 +294,7 @@ func writeSorted(records []sortRecord, output string) error {
 	}
 
 	if output == "" {
-		fmt.Print(sb.String())
+		fmt.Fprint(stdout, sb.String())
 		return nil
 	}
 	if err := os.WriteFile(output, []byte(sb.String()), 0o644); err != nil {

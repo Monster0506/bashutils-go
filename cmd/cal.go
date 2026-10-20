@@ -48,8 +48,8 @@ If only the year is given, the full year is displayed.`,
 // printMonth prints a single month calendar
 func printMonth(month, year int) {
 	monthName := time.Month(month).String()
-	fmt.Printf("     %s %d\n", monthName, year)
-	fmt.Println("Su Mo Tu We Th Fr Sa")
+	fmt.Fprintf(stdout, "     %s %d\n", monthName, year)
+	fmt.Fprintln(stdout, "Su Mo Tu We Th Fr Sa")
 
 	// First day of the month
 	firstDay := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
@@ -60,42 +60,42 @@ func printMonth(month, year int) {
 
 	// Print leading spaces
 	for i := 0; i < startWeekday; i++ {
-		fmt.Print("   ")
+		fmt.Fprint(stdout, "   ")
 	}
 
 	// Print days
 	day := 1
 	for i := startWeekday; day <= daysInMonth; i++ {
-		fmt.Printf("%2d ", day)
+		fmt.Fprintf(stdout, "%2d ", day)
 		if i%7 == 6 {
-			fmt.Println()
+			fmt.Fprintln(stdout)
 		}
 		day++
 	}
 	if (startWeekday+daysInMonth)%7 != 0 {
-		fmt.Println()
+		fmt.Fprintln(stdout)
 	}
 }
 
 // printYear prints the full year calendar
 func printYear(year int) {
-	fmt.Printf("                             %d\n\n", year)
+	fmt.Fprintf(stdout, "                             %d\n\n", year)
 	for quarter := 0; quarter < 4; quarter++ {
 		// Print month names
 		for m := 1; m <= 3; m++ {
 			month := time.Month(quarter*3 + m)
-			fmt.Printf("      %-9s", month.String())
+			fmt.Fprintf(stdout, "      %-9s", month.String())
 			if m < 3 {
-				fmt.Print("   ")
+				fmt.Fprint(stdout, "   ")
 			}
 		}
-		fmt.Println()
+		fmt.Fprintln(stdout)
 
 		// Print weekday headers
 		for m := 0; m < 3; m++ {
-			fmt.Print("Su Mo Tu We Th Fr Sa  ")
+			fmt.Fprint(stdout, "Su Mo Tu We Th Fr Sa  ")
 		}
-		fmt.Println()
+		fmt.Fprintln(stdout)
 
 		// Prepare month data
 		monthDays := [3][]string{}
@@ -108,17 +108,17 @@ func printYear(year int) {
 		for week := 0; week < 6; week++ {
 			for m := 0; m < 3; m++ {
 				if week < len(monthDays[m]) {
-					fmt.Print(monthDays[m][week])
+					fmt.Fprint(stdout, monthDays[m][week])
 				} else {
-					fmt.Print(strings.Repeat(" ", 20))
+					fmt.Fprint(stdout, strings.Repeat(" ", 20))
 				}
 				if m < 2 {
-					fmt.Print("  ")
+					fmt.Fprint(stdout, "  ")
 				}
 			}
-			fmt.Println()
+			fmt.Fprintln(stdout)
 		}
-		fmt.Println()
+		fmt.Fprintln(stdout)
 	}
 }
 

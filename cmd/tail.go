@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 
@@ -96,10 +95,10 @@ func tailLines(r io.Reader, spec countSpec) error {
 
 	for i, line := range lines {
 		if i == len(lines)-1 && scanner.Unterminated() {
-			fmt.Print(line)
+			fmt.Fprint(stdout, line)
 			continue
 		}
-		fmt.Println(line)
+		fmt.Fprintln(stdout, line)
 	}
 	return nil
 }
@@ -114,7 +113,7 @@ func tailBytes(r io.Reader, spec countSpec) error {
 				return err
 			}
 		}
-		_, err := io.Copy(os.Stdout, r)
+		_, err := io.Copy(stdout, r)
 		return err
 	}
 
@@ -125,6 +124,6 @@ func tailBytes(r io.Reader, spec countSpec) error {
 	if spec.n < len(data) {
 		data = data[len(data)-spec.n:]
 	}
-	_, err = os.Stdout.Write(data)
+	_, err = stdout.Write(data)
 	return err
 }

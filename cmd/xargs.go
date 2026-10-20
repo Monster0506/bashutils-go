@@ -468,6 +468,7 @@ func executeSingleCommand(args []string, verbose bool) {
 		fmt.Fprintln(os.Stderr, strings.Join(args, " "))
 	}
 
+	flushOut()
 	cmd := buildCommand(args)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

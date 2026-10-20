@@ -130,14 +130,14 @@ func printHeader(in input, mode headerMode) {
 	}
 
 	if in.index > 0 {
-		fmt.Println()
+		fmt.Fprintln(stdout)
 	}
-	fmt.Printf("==> %s <==\n", in.name)
+	fmt.Fprintf(stdout, "==> %s <==\n", in.name)
 }
 
 func printLine(s *utils.LineScanner) {
-	fmt.Print(s.Text())
+	fmt.Fprint(stdout, s.Text())
 	if !s.Unterminated() {
-		fmt.Println()
+		fmt.Fprintln(stdout)
 	}
 }

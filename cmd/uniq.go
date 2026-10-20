@@ -125,14 +125,14 @@ func (o *uniqOpts) print(g uniqGroup) {
 
 	if o.all {
 		for _, line := range g.lines {
-			fmt.Println(line)
+			fmt.Fprintln(stdout, line)
 		}
 		return
 	}
 
 	if o.count {
-		fmt.Printf("%7d %s\n", len(g.lines), g.lines[0])
+		fmt.Fprintf(stdout, "%7d %s\n", len(g.lines), g.lines[0])
 		return
 	}
-	fmt.Println(g.lines[0])
+	fmt.Fprintln(stdout, g.lines[0])
 }

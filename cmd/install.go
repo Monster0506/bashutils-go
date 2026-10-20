@@ -59,7 +59,7 @@ Rerun with --force after rebuilding to refresh them.`,
 				continue
 			}
 
-			fmt.Println(dst)
+			fmt.Fprintln(stdout, dst)
 		}
 
 		return nil

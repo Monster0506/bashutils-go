@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
@@ -56,7 +55,7 @@ func headLines(r io.Reader, n int) error {
 	for scanner.Scan() {
 		pending = append(pending, scanner.Text())
 		if len(pending) > -n {
-			fmt.Println(pending[0])
+			fmt.Fprintln(stdout, pending[0])
 			pending = pending[1:]
 		}
 	}
@@ -65,7 +64,7 @@ func headLines(r io.Reader, n int) error {
 
 func headBytes(r io.Reader, n int) error {
 	if n >= 0 {
-		_, err := io.CopyN(os.Stdout, r, int64(n))
+		_, err := io.CopyN(stdout, r, int64(n))
 		if err == io.EOF {
 			return nil
 		}
@@ -77,7 +76,7 @@ func headBytes(r io.Reader, n int) error {
 		return err
 	}
 	if keep := len(data) + n; keep > 0 {
-		_, err = os.Stdout.Write(data[:keep])
+		_, err = stdout.Write(data[:keep])
 	}
 	return err
 }

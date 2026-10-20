@@ -47,7 +47,7 @@ func pasteSerial(scanners []*utils.LineScanner, delimiters []string) error {
 		if err := scanner.Err(); err != nil {
 			return fail(1, "paste: reading input: %v", err)
 		}
-		fmt.Println(out.String())
+		fmt.Fprintln(stdout, out.String())
 	}
 	return nil
 }
@@ -78,7 +78,7 @@ func pasteParallel(scanners []*utils.LineScanner, delimiters []string) error {
 				out.WriteString(delimiters[i%len(delimiters)])
 			}
 		}
-		fmt.Println(out.String())
+		fmt.Fprintln(stdout, out.String())
 	}
 }
 

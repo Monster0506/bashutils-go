@@ -47,9 +47,9 @@ var echoCmd = &cobra.Command{
 		}
 
 		if opts.suppressNewline {
-			fmt.Print(out)
+			fmt.Fprint(stdout, out)
 		} else {
-			fmt.Println(out)
+			fmt.Fprintln(stdout, out)
 		}
 		return nil
 	},

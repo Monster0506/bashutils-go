@@ -367,7 +367,7 @@ func (g *grepper) printSeparator(first, lastPrinted int) {
 		return
 	}
 	if g.printed && (lastPrinted == 0 || first > lastPrinted+1) {
-		fmt.Println("--")
+		fmt.Fprintln(stdout, "--")
 	}
 }
 
@@ -375,26 +375,26 @@ func (g *grepper) finishStream(name string, show bool, count int) {
 	switch {
 	case g.output == outCount:
 		printPrefix(name, show, matchSep)
-		fmt.Println(count)
+		fmt.Fprintln(stdout, count)
 	case g.output == outListFiles && count > 0:
-		fmt.Println(name)
+		fmt.Fprintln(stdout, name)
 	case g.output == outListMissing && count == 0:
-		fmt.Println(name)
+		fmt.Fprintln(stdout, name)
 	}
 }
 
 func printPrefix(name string, show bool, sep string) {
 	if show {
-		fmt.Print(name + sep)
+		fmt.Fprint(stdout, name+sep)
 	}
 }
 
 func (g *grepper) printLine(name string, show bool, lineNum int, sep, line string) {
 	printPrefix(name, show, sep)
 	if g.lineNumber {
-		fmt.Printf("%d%s", lineNum, sep)
+		fmt.Fprintf(stdout, "%d%s", lineNum, sep)
 	}
-	fmt.Println(line)
+	fmt.Fprintln(stdout, line)
 	g.printed = true
 }
 

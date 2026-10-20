@@ -49,7 +49,7 @@ var cutCmd = &cobra.Command{
 			scanner := utils.NewScanner(r)
 			for scanner.Scan() {
 				if out, ok := c.cutLine(scanner.Text()); ok {
-					fmt.Println(out)
+					fmt.Fprintln(stdout, out)
 				}
 			}
 

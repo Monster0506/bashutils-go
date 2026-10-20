@@ -52,7 +52,9 @@ func Execute() {
 	rootCmd.SetArgs(normalizeArgs(invocationArgs()))
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
-	os.Exit(exitCode(rootCmd.Execute()))
+	code := exitCode(rootCmd.Execute())
+	flushOut()
+	os.Exit(code)
 }
 
 func exitCode(err error) int {
