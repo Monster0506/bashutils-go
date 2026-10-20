@@ -112,3 +112,19 @@ func TestXargsAcceptsAttachedAndLongOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestXargsRunsDefaultEchoOnEmptyInput(t *testing.T) {
+	r := run(t, "", "xargs")
+
+	if r.stdout != "\n" || r.code != 0 {
+		t.Fatalf("stdout %q, code %d", r.stdout, r.code)
+	}
+}
+
+func TestXargsNoRunIfEmptySkipsCommand(t *testing.T) {
+	r := run(t, "", "xargs", "-r")
+
+	if r.stdout != "" || r.code != 0 {
+		t.Fatalf("stdout %q, code %d", r.stdout, r.code)
+	}
+}

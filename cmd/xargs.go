@@ -50,18 +50,16 @@ items read from standard input.`,
 			os.Exit(1)
 		}
 
+		if len(commandArgs) == 0 {
+			commandArgs = []string{"bashutils", "echo"}
+		}
+
 		if len(items) == 0 {
 			if noRunIfEmpty {
 				return
 			}
-			if len(commandArgs) > 0 {
-				executeCommand(commandArgs, nil, replaceStr, verbose)
-			}
+			executeCommand(commandArgs, nil, replaceStr, verbose)
 			return
-		}
-
-		if len(commandArgs) == 0 {
-			commandArgs = []string{"bashutils", "echo"}
 		}
 
 		if maxArgs > 0 {
@@ -233,13 +231,6 @@ func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error)
 	}
 
 	return items, scanner.Err()
-}
-
-func parseInt(s string) int {
-	if i, err := strconv.Atoi(s); err == nil {
-		return i
-	}
-	return 0
 }
 
 func executeCommand(command []string, args []string, replaceStr string, verbose bool) {
