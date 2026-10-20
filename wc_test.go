@@ -37,3 +37,35 @@ func TestWcTotalsMultipleFiles(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestWcMaxLineLength(t *testing.T) {
+	cases := []struct {
+		in   string
+		args []string
+		want string
+	}{
+		{"ab\nabcd\n", []string{"-L"}, "4\n"},
+		{"a\tb\n", []string{"-L"}, "9\n"},
+		{"héé\n", []string{"-L"}, "3\n"},
+		{"a b\n", []string{"-lL"}, "1 3\n"},
+	}
+
+	for _, c := range cases {
+		got := run(t, c.in, append([]string{"wc"}, c.args...)...).stdout
+		if got != c.want {
+			t.Errorf("wc %v: got %q, want %q", c.args, got, c.want)
+		}
+	}
+}
+
+func TestWcMaxLineLengthTotalIsMaximum(t *testing.T) {
+	f1 := writeFile(t, "a.txt", "abcdef\n")
+	f2 := writeFile(t, "b.txt", "xy\n")
+
+	got := run(t, "", "wc", "-L", f1, f2).stdout
+
+	want := "6 " + f1 + "\n2 " + f2 + "\n6 total\n"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}

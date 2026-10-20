@@ -15,7 +15,9 @@ type wcCount struct {
 	values map[string]int
 }
 
-var wcColumns = []string{"lines", "words", "chars", "bytes"}
+const tabWidth = 8
+
+var wcColumns = []string{"lines", "words", "chars", "bytes", "maxlen"}
 
 var wcCmd = &cobra.Command{
 	Use:   "wc [files...]",
@@ -51,6 +53,7 @@ func init() {
 	wcCmd.Flags().BoolP("words", "w", false, "print word count")
 	wcCmd.Flags().BoolP("bytes", "c", false, "print byte count")
 	wcCmd.Flags().BoolP("chars", "m", false, "print character count")
+	wcCmd.Flags().BoolP("maxlen", "L", false, "print the maximum display width")
 }
 
 func countText(label string, data []byte) wcCount {
@@ -58,12 +61,29 @@ func countText(label string, data []byte) wcCount {
 	return wcCount{
 		label: label,
 		values: map[string]int{
-			"lines": strings.Count(text, "\n"),
-			"words": len(strings.Fields(text)),
-			"chars": utf8.RuneCountInString(text),
-			"bytes": len(data),
+			"lines":  strings.Count(text, "\n"),
+			"words":  len(strings.Fields(text)),
+			"chars":  utf8.RuneCountInString(text),
+			"bytes":  len(data),
+			"maxlen": maxLineWidth(text),
 		},
 	}
+}
+
+func maxLineWidth(text string) int {
+	widest := 0
+	for _, line := range strings.Split(text, "\n") {
+		col := 0
+		for _, r := range strings.TrimSuffix(line, "\r") {
+			if r == '\t' {
+				col += tabWidth - col%tabWidth
+				continue
+			}
+			col++
+		}
+		widest = max(widest, col)
+	}
+	return widest
 }
 
 func printCounts(counts []wcCount, selected []string) {
@@ -95,6 +115,10 @@ func totalOf(counts []wcCount, selected []string) wcCount {
 	total := wcCount{label: "total", values: map[string]int{}}
 	for _, c := range counts {
 		for _, name := range selected {
+			if name == "maxlen" {
+				total.values[name] = max(total.values[name], c.values[name])
+				continue
+			}
 			total.values[name] += c.values[name]
 		}
 	}
