@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"unicode"
+	"unicode/utf8"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
@@ -67,13 +67,7 @@ var wcCmd = &cobra.Command{
 			words := len(strings.Fields(content))
 			bytes := len(data)
 
-			// Count **non-whitespace characters**
-			chars := 0
-			for _, r := range content {
-				if !unicode.IsSpace(r) {
-					chars++
-				}
-			}
+			chars := utf8.RuneCountInString(content)
 
 			totalLines += lines
 			totalWords += words
@@ -189,5 +183,5 @@ func init() {
 	wcCmd.Flags().BoolP("lines", "l", false, "print newline count")
 	wcCmd.Flags().BoolP("words", "w", false, "print word count")
 	wcCmd.Flags().BoolP("bytes", "c", false, "print byte count")
-	wcCmd.Flags().BoolP("chars", "m", false, "print non-whitespace character count")
+	wcCmd.Flags().BoolP("chars", "m", false, "print character count")
 }
