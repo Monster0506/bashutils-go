@@ -67,6 +67,9 @@ type grepper struct {
 	output       outputMode
 	maxCount     int
 	matched      bool
+	before       int
+	after        int
+	printed      bool
 }
 
 var grepExprs []string
@@ -124,6 +127,9 @@ func init() {
 	grepCmd.Flags().BoolP("no-filename", "h", false, "suppress the file name prefix")
 	grepCmd.Flags().Bool("help", false, "help for grep")
 	grepCmd.Flags().BoolP("only-matching", "o", false, "print only the matched parts of a line")
+	grepCmd.Flags().IntP("after-context", "A", 0, "print NUM lines of trailing context")
+	grepCmd.Flags().IntP("before-context", "B", 0, "print NUM lines of leading context")
+	grepCmd.Flags().IntP("context", "C", 0, "print NUM lines of output context")
 }
 
 func newGrepper(cmd *cobra.Command, re *regexp.Regexp) *grepper {
@@ -132,6 +138,7 @@ func newGrepper(cmd *cobra.Command, re *regexp.Regexp) *grepper {
 	maxCount, _ := cmd.Flags().GetInt("max-count")
 	onlyMatching, _ := cmd.Flags().GetBool("only-matching")
 
+	before, after := grepContext(cmd)
 	g := &grepper{
 		re:           re,
 		invert:       invert,
@@ -141,6 +148,8 @@ func newGrepper(cmd *cobra.Command, re *regexp.Regexp) *grepper {
 		onlyMatching: onlyMatching,
 		output:       grepOutput(cmd),
 		maxCount:     maxCount,
+		before:       before,
+		after:        after,
 	}
 	if silent, _ := cmd.Flags().GetBool("no-messages"); silent {
 		g.errors = silenceErrors
@@ -267,6 +276,16 @@ func (g *grepper) showsName(in input) bool {
 	return g.names == nameAlways || (g.names == nameAuto && in.count > 1)
 }
 
+const (
+	matchSep   = ":"
+	contextSep = "-"
+)
+
+type numberedLine struct {
+	num  int
+	text string
+}
+
 func (g *grepper) searchStream(in input, r io.Reader) {
 	if g.output == outQuiet && g.matched {
 		return
@@ -275,11 +294,28 @@ func (g *grepper) searchStream(in input, r io.Reader) {
 	name := g.displayName(in)
 	show := g.showsName(in)
 	scanner := utils.NewScanner(r)
-	lineNum, count := 0, 0
+	var before []numberedLine
+	lineNum, count, afterLeft, lastPrinted := 0, 0, 0, 0
+
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
 		if g.re.MatchString(line) == g.invert {
+			if g.output != outLines {
+				continue
+			}
+			if afterLeft > 0 {
+				g.printLine(name, show, lineNum, contextSep, line)
+				lastPrinted = lineNum
+				afterLeft--
+				continue
+			}
+			if g.before > 0 {
+				before = append(before, numberedLine{lineNum, line})
+				if len(before) > g.before {
+					before = before[1:]
+				}
+			}
 			continue
 		}
 
@@ -289,7 +325,18 @@ func (g *grepper) searchStream(in input, r io.Reader) {
 			return
 		}
 		if g.output == outLines {
+			first := lineNum
+			if len(before) > 0 {
+				first = before[0].num
+			}
+			g.printSeparator(first, lastPrinted)
+			for _, b := range before {
+				g.printLine(name, show, b.num, contextSep, b.text)
+			}
+			before = before[:0]
 			g.emit(name, show, lineNum, line)
+			lastPrinted = lineNum
+			afterLeft = g.after
 		}
 		if g.output == outListFiles || g.output == outListMissing {
 			break
@@ -306,10 +353,19 @@ func (g *grepper) searchStream(in input, r io.Reader) {
 	g.finishStream(name, show, count)
 }
 
+func (g *grepper) printSeparator(first, lastPrinted int) {
+	if g.before == 0 && g.after == 0 {
+		return
+	}
+	if g.printed && (lastPrinted == 0 || first > lastPrinted+1) {
+		fmt.Println("--")
+	}
+}
+
 func (g *grepper) finishStream(name string, show bool, count int) {
 	switch {
 	case g.output == outCount:
-		printPrefix(name, show)
+		printPrefix(name, show, matchSep)
 		fmt.Println(count)
 	case g.output == outListFiles && count > 0:
 		fmt.Println(name)
@@ -318,29 +374,44 @@ func (g *grepper) finishStream(name string, show bool, count int) {
 	}
 }
 
-func printPrefix(name string, show bool) {
+func printPrefix(name string, show bool, sep string) {
 	if show {
-		fmt.Printf("%s:", name)
+		fmt.Print(name + sep)
 	}
 }
 
-func (g *grepper) printLine(name string, show bool, lineNum int, line string) {
-	printPrefix(name, show)
+func (g *grepper) printLine(name string, show bool, lineNum int, sep, line string) {
+	printPrefix(name, show, sep)
 	if g.lineNumber {
-		fmt.Printf("%d:", lineNum)
+		fmt.Printf("%d%s", lineNum, sep)
 	}
 	fmt.Println(line)
+	g.printed = true
 }
 
 func (g *grepper) emit(name string, show bool, lineNum int, line string) {
 	if !g.onlyMatching || g.invert {
-		g.printLine(name, show, lineNum, line)
+		g.printLine(name, show, lineNum, matchSep, line)
 		return
 	}
 
 	for _, m := range g.re.FindAllString(line, -1) {
 		if m != "" {
-			g.printLine(name, show, lineNum, m)
+			g.printLine(name, show, lineNum, matchSep, m)
 		}
 	}
+}
+
+func grepContext(cmd *cobra.Command) (int, int) {
+	both, _ := cmd.Flags().GetInt("context")
+	before, _ := cmd.Flags().GetInt("before-context")
+	after, _ := cmd.Flags().GetInt("after-context")
+
+	if !cmd.Flags().Changed("before-context") {
+		before = both
+	}
+	if !cmd.Flags().Changed("after-context") {
+		after = both
+	}
+	return before, after
 }
