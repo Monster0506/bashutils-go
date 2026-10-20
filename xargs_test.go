@@ -44,3 +44,11 @@ func TestXargsKeepsWhitespaceInDelimitedItems(t *testing.T) {
 		}
 	}
 }
+
+func TestXargsReplaceKeepsItemsWhole(t *testing.T) {
+	got := run(t, "a b\nc\n", "xargs", "-I", "{}", binPath, "echo", "[{}]").stdout
+
+	if want := "[a b]\n[c]\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}

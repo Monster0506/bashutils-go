@@ -74,6 +74,10 @@ items read from standard input.`,
 			}
 		}
 
+		if replaceStr != "" && !nullTerminated && delimiter == "" {
+			delimiter = "\n"
+		}
+
 		// Read items from stdin
 		items, err := readItemsFromStdin(nullTerminated, delimiter)
 		if err != nil {
@@ -177,13 +181,12 @@ func parseInt(s string) int {
 
 func executeCommand(command []string, args []string, replaceStr string, verbose bool) {
 	if replaceStr != "" {
-		// Replace the replace string with the arguments
 		for _, arg := range args {
-			replaced := strings.ReplaceAll(strings.Join(command, " "), replaceStr, arg)
-			cmdParts := strings.Fields(replaced)
-			if len(cmdParts) > 0 {
-				executeSingleCommand(cmdParts, verbose)
+			replaced := make([]string, len(command))
+			for i, part := range command {
+				replaced[i] = strings.ReplaceAll(part, replaceStr, arg)
 			}
+			executeSingleCommand(replaced, verbose)
 		}
 	} else {
 		// Build the final command arguments
