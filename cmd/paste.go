@@ -18,9 +18,9 @@ var pasteCmd = &cobra.Command{
 		delimitersStr, _ := cmd.Flags().GetString("delimiters")
 		serial, _ := cmd.Flags().GetBool("serial")
 
-		delimiters := []rune{'\t'}
+		delimiters := []string{"\t"}
 		if delimitersStr != "" {
-			delimiters = []rune(delimitersStr)
+			delimiters = parseDelimiters(delimitersStr)
 		}
 
 		if serial {
@@ -95,7 +95,7 @@ var pasteCmd = &cobra.Command{
 				for i, line := range currentLines {
 					outputBuilder.WriteString(line)
 					if i < len(currentLines)-1 {
-						outputBuilder.WriteRune(delimiters[i%len(delimiters)]) // Cycle through delimiters
+						outputBuilder.WriteString(delimiters[i%len(delimiters)])
 					}
 				}
 				fmt.Println(outputBuilder.String())
@@ -107,4 +107,30 @@ var pasteCmd = &cobra.Command{
 func init() {
 	pasteCmd.Flags().StringP("delimiters", "d", "", "use specified delimiters instead of TAB")
 	pasteCmd.Flags().BoolP("serial", "s", false, "paste one file at a time instead of in parallel (not yet implemented)")
+}
+
+var delimiterEscapes = map[rune]string{
+	'n':  "\n",
+	't':  "\t",
+	'0':  "",
+	'\\': "\\",
+}
+
+func parseDelimiters(s string) []string {
+	var delims []string
+	runes := []rune(s)
+	for i := 0; i < len(runes); i++ {
+		if runes[i] != '\\' || i+1 == len(runes) {
+			delims = append(delims, string(runes[i]))
+			continue
+		}
+
+		i++
+		if d, ok := delimiterEscapes[runes[i]]; ok {
+			delims = append(delims, d)
+			continue
+		}
+		delims = append(delims, string(runes[i]))
+	}
+	return delims
 }
