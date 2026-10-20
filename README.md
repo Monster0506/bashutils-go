@@ -32,20 +32,25 @@ counterpart, with a focus on simplicity and portability.
 
 Currently supported commands:
 
-*   **`cal`**: Display a calendar.
-*   **`cat`**: Concatenate files and print on the standard output.
-*   **`cut`**: Remove sections from each line of files.
-*   **`echo`**: Display a line of text.
-*   **`grep`**: Print lines matching a pattern.
-*   **`head`**: Output the first part of files.
-*   **`paste`**: Merge lines of files.
-*   **`sort`**: Sort lines of text files.
-*   **`split`**: Split a file into pieces.
-*   **`tail`**: Output the last part of files.
-*   **`tr`**: Translate or delete characters.
-*   **`uniq`**: Report or omit repeated lines.
-*   **`wc`**: Print newline, word, and byte counts for each file.
-*   **`xargs`**: Build and execute command lines from standard input.
+*   **`cal`**: Display a calendar. `-m` Monday first, `-y` whole year, `-3` three months.
+*   **`cat`**: Concatenate files. `-n -b -s -E -T`.
+*   **`cut`**: Remove sections from each line. `-f -d -c -b -s --complement --output-delimiter`.
+*   **`echo`**: Display a line of text. `-n -e -E`, `--expand-env`.
+*   **`grep`**: Print lines matching a pattern. `-e -f -E -F -i -v -w -x -n -c -l -L -q -s -m -H -h -o -A -B -C -r -R --include --exclude --exclude-dir`.
+*   **`head`**: Output the first part of files. `-n NUM` (or `-NUM`, negative NUM), `-c`, `-q`, `-v`.
+*   **`paste`**: Merge lines of files. `-d -s`.
+*   **`sort`**: Sort lines. `-k KEYDEF -t -n -r -u -f -b -s -c -o`.
+*   **`split`**: Split a file into pieces. `-l -b -d -a --additional-suffix`.
+*   **`tail`**: Output the last part of files. `-n NUM` (or `-NUM`, `+NUM`), `-c`, `-q`, `-v`.
+*   **`tr`**: Translate or delete characters. `-d -c -s -t`, classes like `[:alpha:]`, escapes like `\n`.
+*   **`uniq`**: Report or omit repeated lines. `-c -d -D -u -i -f -s -w`.
+*   **`wc`**: Print line, word, character, byte and line-length counts. `-l -w -m -c -L`.
+*   **`xargs`**: Build and execute command lines from standard input. `-n -L -I -0 -d -a -E -P -r -t`.
+
+`-` reads standard input wherever a file is accepted. Read errors set a non-zero
+exit status without stopping the remaining inputs. Lines keep their CRLF endings
+and a missing final newline is preserved by `cat`, `head`, `tail` and `split`.
+`xargs` runs the commands above in-process before searching `PATH`.
 
 ## Globbing Support
 
