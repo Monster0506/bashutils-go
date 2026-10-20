@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -133,6 +134,54 @@ func TestGrepOnlyMatching(t *testing.T) {
 		got := run(t, c.in, append([]string{"grep"}, c.args...)...).stdout
 		if got != c.want {
 			t.Errorf("grep %v: got %q, want %q", c.args, got, c.want)
+		}
+	}
+}
+
+func makeTree(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	files := map[string]string{
+		"a.txt":         "needle\nhay\n",
+		"sub/b.txt":     "hay\nneedle\n",
+		"sub/c.md":      "needle\n",
+		"skip/d.txt":    "needle\n",
+		"sub/deep/e.go": "hay\n",
+	}
+
+	for name, content := range files {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+func TestGrepRecursive(t *testing.T) {
+	dir := makeTree(t)
+	p := func(rel string) string { return filepath.Join(dir, filepath.FromSlash(rel)) }
+
+	cases := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"-r", "needle", dir}, p("a.txt") + ":needle\n" + p("skip/d.txt") + ":needle\n" + p("sub/b.txt") + ":needle\n" + p("sub/c.md") + ":needle\n"},
+		{[]string{"-r", "--include=*.txt", "needle", dir}, p("a.txt") + ":needle\n" + p("skip/d.txt") + ":needle\n" + p("sub/b.txt") + ":needle\n"},
+		{[]string{"-r", "--exclude=*.md", "--exclude-dir=skip", "needle", dir}, p("a.txt") + ":needle\n" + p("sub/b.txt") + ":needle\n"},
+		{[]string{"-rl", "needle", dir}, p("a.txt") + "\n" + p("skip/d.txt") + "\n" + p("sub/b.txt") + "\n" + p("sub/c.md") + "\n"},
+		{[]string{"-rh", "--include=*.md", "needle", dir}, "needle\n"},
+		{[]string{"-r", "needle", p("a.txt")}, "needle\n"},
+	}
+
+	for _, c := range cases {
+		got := run(t, "", append([]string{"grep"}, c.args...)...).stdout
+		if got != c.want {
+			t.Errorf("grep %v:\ngot  %q\nwant %q", c.args, got, c.want)
 		}
 	}
 }

@@ -90,7 +90,11 @@ var grepCmd = &cobra.Command{
 		}
 
 		g := newGrepper(cmd, re)
-		eachInputMode("grep", fileArgs, g.errors, func(in input, r io.Reader) {
+		inputs, sawDir := grepInputs(cmd, fileArgs, g.errors)
+		if sawDir && g.names == nameAuto {
+			g.names = nameAlways
+		}
+		runInputs("grep", inputs, g.errors, func(in input, r io.Reader) {
 			g.searchStream(in, r)
 		})
 
@@ -130,6 +134,11 @@ func init() {
 	grepCmd.Flags().IntP("after-context", "A", 0, "print NUM lines of trailing context")
 	grepCmd.Flags().IntP("before-context", "B", 0, "print NUM lines of leading context")
 	grepCmd.Flags().IntP("context", "C", 0, "print NUM lines of output context")
+	grepCmd.Flags().BoolP("recursive", "r", false, "read all files under each directory, recursively")
+	grepCmd.Flags().BoolP("dereference-recursive", "R", false, "like -r")
+	grepCmd.Flags().StringArrayVar(&grepIncludes, "include", nil, "search only files whose base name matches GLOB")
+	grepCmd.Flags().StringArrayVar(&grepExcludes, "exclude", nil, "skip files whose base name matches GLOB")
+	grepCmd.Flags().StringArrayVar(&grepExcludeDirs, "exclude-dir", nil, "skip directories whose base name matches GLOB")
 }
 
 func newGrepper(cmd *cobra.Command, re *regexp.Regexp) *grepper {

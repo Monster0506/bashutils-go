@@ -77,7 +77,11 @@ func eachInput(cmdName string, args []string, fn func(in input, r io.Reader)) {
 }
 
 func eachInputMode(cmdName string, args []string, mode errorMode, fn func(in input, r io.Reader)) {
-	for _, in := range resolveInputs(cmdName, args, mode) {
+	runInputs(cmdName, resolveInputs(cmdName, args, mode), mode, fn)
+}
+
+func runInputs(cmdName string, inputs []input, mode errorMode, fn func(in input, r io.Reader)) {
+	for _, in := range inputs {
 		r := openInput(cmdName, in, mode)
 		if r == nil {
 			continue
