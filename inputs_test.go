@@ -14,6 +14,7 @@ func TestDashReadsStdinEverywhere(t *testing.T) {
 		{[]string{"sort", "-"}, "a\nb\n"},
 		{[]string{"uniq", "-"}, "b\na\n"},
 		{[]string{"cat", "-"}, "b\na\n"},
+		{[]string{"grep", ".", "-"}, "b\na\n"},
 		{[]string{"paste", "-"}, "b\na\n"},
 		{[]string{"head", "-"}, "b\na\n"},
 		{[]string{"tail", "-"}, "b\na\n"},
