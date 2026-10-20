@@ -52,3 +52,14 @@ func TestXargsReplaceKeepsItemsWhole(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestXargsContinuesAfterFailure(t *testing.T) {
+	good := writeFile(t, "good.txt", "hello\n")
+	missing := good + ".missing"
+
+	r := run(t, missing+"\n"+good+"\n", "xargs", "-n", "1", binPath, "cat")
+
+	if r.stdout != "hello\n" || r.code != 123 {
+		t.Fatalf("stdout %q, code %d", r.stdout, r.code)
+	}
+}

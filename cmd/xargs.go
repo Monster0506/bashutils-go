@@ -197,6 +197,8 @@ func executeCommand(command []string, args []string, replaceStr string, verbose 
 	}
 }
 
+const childFailedStatus = 123
+
 func executeSingleCommand(args []string, verbose bool) {
 	if verbose {
 		fmt.Fprintln(os.Stderr, strings.Join(args, " "))
@@ -215,7 +217,7 @@ func executeSingleCommand(args []string, verbose bool) {
 			err := subCmd.Run()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "xargs: command failed: %v\n", err)
-				os.Exit(1)
+				exitStatus = childFailedStatus
 			}
 			return
 		}
@@ -230,7 +232,7 @@ func executeSingleCommand(args []string, verbose bool) {
 	err := cmd.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "xargs: command failed: %v\n", err)
-		os.Exit(1)
+		exitStatus = childFailedStatus
 	}
 }
 
