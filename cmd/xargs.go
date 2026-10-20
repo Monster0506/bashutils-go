@@ -34,17 +34,6 @@ items read from standard input.`,
 		var commandArgs []string
 		commandFound := false
 
-		// First pass: check for verbose flag
-		for i := 0; i < len(args); i++ {
-			if args[i] == "-t" || args[i] == "--verbose" {
-				verbose = true
-				break
-			}
-		}
-
-		if verbose {
-			fmt.Fprintf(os.Stderr, "Parsing args: %v\n", args)
-		}
 		for i := 0; i < len(args) && !commandFound; i++ {
 			arg := args[i]
 			switch arg {

@@ -9,3 +9,11 @@ func TestXargsRejectsUnknownOption(t *testing.T) {
 		t.Fatalf("code %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
 	}
 }
+
+func TestXargsVerboseIgnoresChildArgs(t *testing.T) {
+	r := run(t, "x\n", "xargs", binPath, "echo", "--", "-t")
+
+	if r.stdout != "-t x\n" || r.stderr != "" {
+		t.Fatalf("stdout %q, stderr %q", r.stdout, r.stderr)
+	}
+}
