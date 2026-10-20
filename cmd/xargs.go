@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
@@ -56,14 +57,16 @@ items read from standard input.`,
 
 		if len(batches) == 0 {
 			if !opts.noRun {
-				executeCommand(commandArgs, nil, opts.replace, opts.verbose)
+				runCommands(commandLines(commandArgs, nil, opts.replace), opts.parallel, opts.verbose)
 			}
 			return nil
 		}
 
+		var cmds [][]string
 		for _, batch := range batches {
-			executeCommand(commandArgs, batch, opts.replace, opts.verbose)
+			cmds = append(cmds, commandLines(commandArgs, batch, opts.replace)...)
 		}
+		runCommands(cmds, opts.parallel, opts.verbose)
 		return nil
 	},
 }
@@ -79,10 +82,11 @@ type xargsOpts struct {
 	noRun     bool
 	verbose   bool
 	file      string
+	parallel  int
 	eof       string
 }
 
-const xargsValued = "nIdaLE"
+const xargsValued = "nIdaLEP"
 
 var xargsLong = map[string]rune{
 	"max-args":        'n',
@@ -94,11 +98,12 @@ var xargsLong = map[string]rune{
 	"verbose":         't',
 	"arg-file":        'a',
 	"eof":             'E',
+	"max-procs":       'P',
 	"help":            'h',
 }
 
 func parseXargsArgs(args []string) (xargsOpts, []string, error) {
-	var o xargsOpts
+	o := xargsOpts{parallel: 1}
 	i := 0
 	for ; i < len(args); i++ {
 		arg := args[i]
@@ -178,6 +183,12 @@ func (o *xargsOpts) apply(letter rune, value string, hasValue bool, rest []strin
 			return 0, fmt.Errorf("invalid number %q for -L option", value)
 		}
 		o.maxLines = n
+	case 'P':
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return 0, fmt.Errorf("invalid number %q for -P option", value)
+		}
+		o.parallel = n
 	case 'E':
 		o.eof = value
 	case '0':
@@ -402,22 +413,49 @@ func readQuotedItems(r io.Reader) ([]string, error) {
 func isEscapable(r rune) bool {
 	return r == '\'' || r == '"' || unicode.IsSpace(r)
 }
-func executeCommand(command []string, args []string, replaceStr string, verbose bool) {
-	if replaceStr != "" {
-		for _, arg := range args {
-			replaced := make([]string, len(command))
-			for i, part := range command {
-				replaced[i] = strings.ReplaceAll(part, replaceStr, arg)
-			}
-			executeSingleCommand(replaced, verbose)
-		}
-	} else {
-		// Build the final command arguments
-		var finalArgs []string
-		finalArgs = append(finalArgs, command...)
-		finalArgs = append(finalArgs, args...)
-		executeSingleCommand(finalArgs, verbose)
+
+var failMu sync.Mutex
+
+func commandLines(command, items []string, replace string) [][]string {
+	if replace == "" {
+		return [][]string{append(append([]string{}, command...), items...)}
 	}
+
+	cmds := make([][]string, 0, len(items))
+	for _, item := range items {
+		replaced := make([]string, len(command))
+		for i, part := range command {
+			replaced[i] = strings.ReplaceAll(part, replace, item)
+		}
+		cmds = append(cmds, replaced)
+	}
+	return cmds
+}
+
+func runCommands(cmds [][]string, parallel int, verbose bool) {
+	limit := parallel
+	if limit == 0 || limit > len(cmds) {
+		limit = len(cmds)
+	}
+	if limit <= 1 {
+		for _, c := range cmds {
+			executeSingleCommand(c, verbose)
+		}
+		return
+	}
+
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, limit)
+	for _, c := range cmds {
+		slots <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			executeSingleCommand(c, verbose)
+			<-slots
+		}()
+	}
+	wg.Wait()
 }
 
 const (
@@ -437,7 +475,9 @@ func executeSingleCommand(args []string, verbose bool) {
 
 	if err := cmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "xargs: command failed: %v\n", err)
+		failMu.Lock()
 		exitStatus = childFailedStatus
+		failMu.Unlock()
 	}
 }
 
@@ -472,4 +512,8 @@ func init() {
 	xargsCmd.Flags().StringP("delimiter", "d", "", "input items are terminated by the specified character")
 	xargsCmd.Flags().BoolP("no-run-if-empty", "r", false, "if the standard input does not contain any nonblanks, do not run the command")
 	xargsCmd.Flags().BoolP("verbose", "t", false, "print the command line on the standard error output before executing it")
+	xargsCmd.Flags().StringP("arg-file", "a", "", "read items from FILE instead of standard input")
+	xargsCmd.Flags().IntP("max-lines", "L", 0, "use at most MAX-LINES non-blank input lines per command line")
+	xargsCmd.Flags().StringP("eof", "E", "", "stop reading items at the logical end-of-file string EOF-STR")
+	xargsCmd.Flags().IntP("max-procs", "P", 1, "run at most MAX-PROCS processes at a time (0 means no limit)")
 }
