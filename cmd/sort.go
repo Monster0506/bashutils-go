@@ -5,6 +5,7 @@ import (
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,16 +53,16 @@ var sortCmd = &cobra.Command{
 			}
 
 			if numeric {
-				numI, errI := strconv.ParseFloat(keyI, 64)
-				numJ, errJ := strconv.ParseFloat(keyJ, 64)
+				numI, okI := leadingNumber(keyI)
+				numJ, okJ := leadingNumber(keyJ)
 
-				if errI != nil && errJ != nil {
+				if !okI && !okJ {
 					return keyI < keyJ
 				}
-				if errI != nil {
+				if !okI {
 					return false
 				}
-				if errJ != nil {
+				if !okJ {
 					return true
 				}
 				return numI < numJ
@@ -101,4 +102,16 @@ func init() {
 	sortCmd.Flags().BoolP("unique", "u", false, "output only the first of an equal run")
 	sortCmd.Flags().IntP("key", "k", 0, "sort by the specified column (1-based index)")
 	sortCmd.Flags().StringP("field-separator", "t", "", "use specified character as field separator")
+}
+
+var leadingNumberRe = regexp.MustCompile(`^\s*[+-]?(\d+(\.\d*)?|\.\d+)`)
+
+func leadingNumber(s string) (float64, bool) {
+	match := leadingNumberRe.FindString(s)
+	if match == "" {
+		return 0, false
+	}
+
+	n, err := strconv.ParseFloat(strings.TrimSpace(match), 64)
+	return n, err == nil
 }
