@@ -134,6 +134,21 @@ For detailed usage and flags for each command, use the `--help` flag:
 bashutils <command> --help
 ```
 
+### Running commands without the `bashutils` prefix
+
+The executable picks its command from its own file name (`grep.exe` runs
+`bashutils grep`). Create one executable per command in a directory and add
+that directory to your `PATH`:
+
+```bash
+bashutils install "$HOME/bashutils-bin"
+```
+
+Hardlinks are used (a copy if linking fails). Rerun with `--force` after
+rebuilding to refresh them. On Windows, PowerShell aliases (`cat`, `echo`,
+`sort`) take precedence over executables on `PATH`; remove them with
+`Remove-Item Alias:cat,Alias:echo,Alias:sort` in your `$PROFILE`.
+
 ## Contributing
 
 This project is a personal endeavor born out of a desire to learn and fill a

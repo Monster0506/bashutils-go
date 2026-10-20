@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -14,8 +16,24 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
+	dispatchByName()
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
+	}
+}
+
+func dispatchByName() {
+	base := filepath.Base(os.Args[0])
+	name := strings.ToLower(strings.TrimSuffix(base, filepath.Ext(base)))
+
+	for _, c := range rootCmd.Commands() {
+		if c.Name() != name {
+			continue
+		}
+
+		rootCmd.SetArgs(append([]string{name}, os.Args[1:]...))
+		return
 	}
 }
 
@@ -34,4 +52,5 @@ func init() {
 	rootCmd.AddCommand(splitCmd)
 	rootCmd.AddCommand(xargsCmd)
 	rootCmd.AddCommand(calCmd)
+	rootCmd.AddCommand(installCmd)
 }
