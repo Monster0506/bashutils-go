@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/monster0506/bashutils-go/internal/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -16,11 +15,7 @@ var uniqCmd = &cobra.Command{
 		repeated, _ := cmd.Flags().GetBool("repeated")
 		unique, _ := cmd.Flags().GetBool("unique")
 
-		allLines, err := utils.ReadLinesFromFilesOrStdin(args)
-		if err != nil {
-			warn("uniq: %v\n", err)
-			return
-		}
+		allLines := readLines("uniq", args)
 
 		if len(allLines) == 0 {
 			return

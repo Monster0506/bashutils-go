@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
 	"regexp"
 	"sort"
@@ -21,11 +20,7 @@ var sortCmd = &cobra.Command{
 		column, _ := cmd.Flags().GetInt("key")
 		separator, _ := cmd.Flags().GetString("field-separator")
 
-		allLines, err := utils.ReadLinesFromFilesOrStdin(args)
-		if err != nil {
-			warn("sort: %v\n", err)
-			return
-		}
+		allLines := readLines("sort", args)
 
 		sort.SliceStable(allLines, func(i, j int) bool {
 			var keyI, keyJ string
