@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -93,5 +94,52 @@ func TestSplitLinesKeepsMissingFinalNewline(t *testing.T) {
 	_, joined := splitOutputs(t, dir, "p")
 	if joined != "a\nb" {
 		t.Fatalf("got %q", joined)
+	}
+}
+
+func splitNames(t *testing.T, args []string, in string) ([]string, result) {
+	t.Helper()
+
+	src := writeFile(t, "in.txt", in)
+	dir := t.TempDir()
+
+	full := append([]string{"split"}, args...)
+	full = append(full, src, filepath.Join(dir, "p"))
+	r := run(t, "", full...)
+
+	names, _ := splitOutputs(t, dir, "p")
+	return names, r
+}
+
+func TestSplitSuffixOptions(t *testing.T) {
+	cases := []struct {
+		args []string
+		want []string
+	}{
+		{[]string{"-l", "1", "-a", "3"}, []string{"paaa", "paab"}},
+		{[]string{"-l", "1", "-d"}, []string{"p00", "p01"}},
+		{[]string{"-l", "1", "-d", "-a", "3"}, []string{"p000", "p001"}},
+		{[]string{"-l", "1", "--additional-suffix=.txt"}, []string{"paa.txt", "pab.txt"}},
+		{[]string{"-b", "2", "-d"}, []string{"p00", "p01"}},
+	}
+
+	for _, c := range cases {
+		names, r := splitNames(t, c.args, "a\nb\n")
+		if !reflect.DeepEqual(names, c.want) || r.code != 0 {
+			t.Errorf("split %v: got %v (code %d), want %v", c.args, names, r.code, c.want)
+		}
+	}
+}
+
+func TestSplitSuffixExhaustion(t *testing.T) {
+	var in strings.Builder
+	for i := range 11 {
+		fmt.Fprintf(&in, "line%d\n", i)
+	}
+
+	names, r := splitNames(t, []string{"-l", "1", "-d", "-a", "1"}, in.String())
+
+	if len(names) != 10 || r.code == 0 || !strings.Contains(r.stderr, "exhausted") {
+		t.Fatalf("names %v, code %d, stderr %q", names, r.code, r.stderr)
 	}
 }

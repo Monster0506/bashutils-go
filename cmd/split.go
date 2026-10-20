@@ -3,31 +3,70 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	"github.com/monster0506/bashutils-go/internal/utils"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
 )
+
+const (
+	defaultSplitLines = 1000
+	alphaBase         = 26
+	numericBase       = 10
+)
+
+type splitNamer struct {
+	prefix  string
+	numeric bool
+	width   int
+	extra   string
+}
+
+func (n splitNamer) name(index int) (string, error) {
+	base := alphaBase
+	if n.numeric {
+		base = numericBase
+	}
+
+	capacity := 1
+	for range n.width {
+		capacity *= base
+	}
+	if index >= capacity {
+		return "", fmt.Errorf("split: output file suffixes exhausted")
+	}
+
+	digits := make([]byte, n.width)
+	for i := n.width - 1; i >= 0; i-- {
+		d := index % base
+		index /= base
+		if n.numeric {
+			digits[i] = byte('0' + d)
+		} else {
+			digits[i] = byte('a' + d)
+		}
+	}
+	return n.prefix + string(digits) + n.extra, nil
+}
 
 var splitCmd = &cobra.Command{
 	Use:   "split [file] [prefix]",
 	Short: "Split files into pieces",
-	Args:  cobra.RangeArgs(1, 2), // file and optional prefix
+	Args:  cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		linesPerFile, _ := cmd.Flags().GetInt64("lines")
 		bytesPerFile, _ := cmd.Flags().GetString("bytes")
-		numericSuffixes, _ := cmd.Flags().GetBool("numeric-suffixes")
 
-		prefix := "x"
-		if len(args) > 1 {
-			prefix = args[1]
+		namer, err := newSplitNamer(cmd, args)
+		if err != nil {
+			return err
 		}
 
 		if linesPerFile == 0 && bytesPerFile == "" {
-			linesPerFile = 1000
+			linesPerFile = defaultSplitLines
 		}
 		if linesPerFile > 0 && bytesPerFile != "" {
 			return fail(1, "split: cannot split by lines and bytes simultaneously")
@@ -45,9 +84,12 @@ var splitCmd = &cobra.Command{
 		defer r.Close()
 
 		if linesPerFile > 0 {
-			splitByLines(r, prefix, linesPerFile, numericSuffixes)
+			err = splitByLines(r, namer, linesPerFile)
 		} else {
-			splitByBytes(r, prefix, bytesPerFile, numericSuffixes)
+			err = splitByBytes(r, namer, bytesPerFile)
+		}
+		if err != nil {
+			return fail(1, "%v", err)
 		}
 		return nil
 	},
@@ -57,68 +99,90 @@ func init() {
 	splitCmd.Flags().Int64P("lines", "l", 0, "split by number of lines")
 	splitCmd.Flags().StringP("bytes", "b", "", "split by number of bytes (e.g., '1K', '1M')")
 	splitCmd.Flags().BoolP("numeric-suffixes", "d", false, "use numeric suffixes instead of alphabetic")
+	splitCmd.Flags().IntP("suffix-length", "a", 2, "generate suffixes of length N")
+	splitCmd.Flags().String("additional-suffix", "", "append an additional SUFFIX to file names")
 }
 
-func generateSuffix(index int, numeric bool) string {
-	if numeric {
-		return fmt.Sprintf("%02d", index) // Pad with leading zeros for consistency
+func newSplitNamer(cmd *cobra.Command, args []string) (splitNamer, error) {
+	width, _ := cmd.Flags().GetInt("suffix-length")
+	if width < 1 {
+		return splitNamer{}, fail(1, "split: invalid suffix length: %d", width)
 	}
-	const alphabet = "abcdefghijklmnopqrstuvwxyz"
-	const minWidth = 2
-	suf := ""
-	for ; index > 0 || len(suf) < minWidth; index /= len(alphabet) {
-		suf = string(alphabet[index%len(alphabet)]) + suf
+
+	n := splitNamer{prefix: "x", width: width}
+	if len(args) > 1 {
+		n.prefix = args[1]
 	}
-	return suf
+	n.numeric, _ = cmd.Flags().GetBool("numeric-suffixes")
+	n.extra, _ = cmd.Flags().GetString("additional-suffix")
+	return n, nil
 }
 
-func splitByLines(inputFile io.Reader, prefix string, linesPerFile int64, numericSuffixes bool) {
-	scanner := utils.NewScanner(inputFile)
-	fileIndex := 0
-	currentLineCount := int64(0)
-	var outputFile *os.File
-	var outputWriter *bufio.Writer
-	var err error
+type pieceWriter struct {
+	file *os.File
+	buf  *bufio.Writer
+}
+
+func createPiece(namer splitNamer, index int) (*pieceWriter, error) {
+	name, err := namer.name(index)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := os.Create(name)
+	if err != nil {
+		return nil, fmt.Errorf("split: creating output file: %v", err)
+	}
+	return &pieceWriter{file: f, buf: bufio.NewWriter(f)}, nil
+}
+
+func (p *pieceWriter) close() error {
+	err := p.buf.Flush()
+	if cerr := p.file.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return fmt.Errorf("split: writing output file: %v", err)
+	}
+	return nil
+}
+
+func splitByLines(r io.Reader, namer splitNamer, perFile int64) error {
+	scanner := utils.NewScanner(r)
+	var piece *pieceWriter
+	index, inPiece := 0, int64(0)
 
 	for scanner.Scan() {
-		if currentLineCount == 0 {
-			if outputFile != nil {
-				outputWriter.Flush()
-				outputFile.Close()
-			}
-			suffix := generateSuffix(fileIndex, numericSuffixes)
-			outputFileName := prefix + suffix
-			outputFile, err = os.Create(outputFileName)
+		if piece == nil {
+			p, err := createPiece(namer, index)
 			if err != nil {
-				warn("split: creating output file: %v\n", err)
-				return
+				return err
 			}
-			outputWriter = bufio.NewWriter(outputFile)
-			fileIndex++
+			piece, index, inPiece = p, index+1, 0
 		}
 
-		_, err = outputWriter.WriteString(scanner.Text())
-		if err == nil && !scanner.Unterminated() {
-			err = outputWriter.WriteByte('\n')
+		piece.buf.WriteString(scanner.Text())
+		if !scanner.Unterminated() {
+			piece.buf.WriteByte('\n')
 		}
-		if err != nil {
-			warn("split: writing to output file: %v\n", err)
-			return
-		}
-		currentLineCount++
 
-		if currentLineCount >= linesPerFile {
-			currentLineCount = 0 // Reset for the next file
+		inPiece++
+		if inPiece < perFile {
+			continue
 		}
+		if err := piece.close(); err != nil {
+			return err
+		}
+		piece = nil
 	}
 
 	if err := scanner.Err(); err != nil {
-		warn("split: reading input: %v\n", err)
+		return fmt.Errorf("split: reading input: %v", err)
 	}
-	if outputFile != nil {
-		outputWriter.Flush()
-		outputFile.Close()
+	if piece != nil {
+		return piece.close()
 	}
+	return nil
 }
 
 func parseBytesString(bytesStr string) (int64, error) {
@@ -153,40 +217,36 @@ func parseBytesString(bytesStr string) (int64, error) {
 	return value * multiplier, nil
 }
 
-func splitByBytes(inputFile io.Reader, prefix string, bytesPerFileStr string, numericSuffixes bool) {
-	bytesPerFile, err := parseBytesString(bytesPerFileStr)
+func splitByBytes(r io.Reader, namer splitNamer, sizeStr string) error {
+	perFile, err := parseBytesString(sizeStr)
 	if err != nil {
-		warn("split: %v\n", err)
-		return
+		return fmt.Errorf("split: %v", err)
 	}
 
-	reader := bufio.NewReader(inputFile)
-	for fileIndex := 0; ; fileIndex++ {
+	reader := bufio.NewReader(r)
+	for index := 0; ; index++ {
 		if _, err := reader.Peek(1); err != nil {
-			if err != io.EOF {
-				warn("split: reading input: %v\n", err)
+			if err == io.EOF {
+				return nil
 			}
-			return
+			return fmt.Errorf("split: reading input: %v", err)
 		}
 
-		outputFile, err := os.Create(prefix + generateSuffix(fileIndex, numericSuffixes))
+		piece, err := createPiece(namer, index)
 		if err != nil {
-			warn("split: creating output file: %v\n", err)
-			return
+			return err
 		}
 
-		_, copyErr := io.CopyN(outputFile, reader, bytesPerFile)
-		if err := outputFile.Close(); err != nil {
-			warn("split: closing output file: %v\n", err)
-			return
+		_, copyErr := io.CopyN(piece.buf, reader, perFile)
+		if err := piece.close(); err != nil {
+			return err
 		}
 
 		if copyErr == io.EOF {
-			return
+			return nil
 		}
 		if copyErr != nil {
-			warn("split: copying to output file: %v\n", copyErr)
-			return
+			return fmt.Errorf("split: copying to output file: %v", copyErr)
 		}
 	}
 }
