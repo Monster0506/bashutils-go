@@ -32,6 +32,7 @@ var trCmd = &cobra.Command{
 
 		expandedSet1 := expandCharSet(set1)
 		expandedSet2 := expandCharSet(set2)
+		set2Runes := []rune(expandedSet2)
 
 		set1Map := make(map[rune]bool)
 		for _, r := range expandedSet1 {
@@ -50,28 +51,32 @@ var trCmd = &cobra.Command{
 			}
 
 			if deleteMode {
-				if complement {
-					if !set1Map[r] {
-						fmt.Print(string(r))
-					}
-				} else {
-					if !set1Map[r] {
-						fmt.Print(string(r))
-					}
-				}
-			} else {
-				idx := strings.IndexRune(expandedSet1, r)
-				if idx != -1 {
-					if idx < len(expandedSet2) {
-						fmt.Print(string(expandedSet2[idx]))
-					} else if len(expandedSet2) > 0 {
-						fmt.Print(string(expandedSet2[len(expandedSet2)-1]))
-					} else {
-						// If set2 empty, delete char
-					}
-				} else {
+				if set1Map[r] == complement {
 					fmt.Print(string(r))
 				}
+				continue
+			}
+
+			if complement {
+				if set1Map[r] {
+					fmt.Print(string(r))
+					continue
+				}
+				if len(set2Runes) > 0 {
+					fmt.Print(string(set2Runes[len(set2Runes)-1]))
+				}
+				continue
+			}
+
+			idx := strings.IndexRune(expandedSet1, r)
+			if idx == -1 {
+				fmt.Print(string(r))
+				continue
+			}
+			if idx < len(expandedSet2) {
+				fmt.Print(string(expandedSet2[idx]))
+			} else if len(expandedSet2) > 0 {
+				fmt.Print(string(expandedSet2[len(expandedSet2)-1]))
 			}
 		}
 	},
