@@ -77,3 +77,43 @@ func TestGrepPatternFile(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestGrepOutputModes(t *testing.T) {
+	f1 := writeFile(t, "f1.txt", "a\nb\na\n")
+	f2 := writeFile(t, "f2.txt", "b\n")
+
+	cases := []struct {
+		in   string
+		args []string
+		want string
+		code int
+	}{
+		{"a\nb\na\n", []string{"-c", "a"}, "2\n", 0},
+		{"", []string{"-c", "a", f1, f2}, f1 + ":2\n" + f2 + ":0\n", 0},
+		{"", []string{"-l", "a", f1, f2}, f1 + "\n", 0},
+		{"", []string{"-L", "a", f1, f2}, f2 + "\n", 0},
+		{"a\n", []string{"-q", "a"}, "", 0},
+		{"b\n", []string{"-q", "a"}, "", 1},
+		{"a\na\na\n", []string{"-m", "2", "a"}, "a\na\n", 0},
+		{"", []string{"-H", "b", f2}, f2 + ":b\n", 0},
+		{"", []string{"-h", "b", f1, f2}, "b\nb\n", 0},
+		{"a\n", []string{"-H", "a"}, "(standard input):a\n", 0},
+	}
+
+	for _, c := range cases {
+		r := run(t, c.in, append([]string{"grep"}, c.args...)...)
+		if r.stdout != c.want || r.code != c.code {
+			t.Errorf("grep %v: got %q (code %d), want %q (code %d)", c.args, r.stdout, r.code, c.want, c.code)
+		}
+	}
+}
+
+func TestGrepSilentSuppressesMissingFileErrors(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing.txt")
+
+	r := run(t, "", "grep", "-s", "a", missing)
+
+	if r.stderr != "" || r.code != 2 {
+		t.Fatalf("stderr %q, code %d", r.stderr, r.code)
+	}
+}

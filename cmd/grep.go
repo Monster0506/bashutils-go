@@ -16,11 +16,34 @@ const (
 	grepError   = 2
 )
 
+type outputMode int
+
+const (
+	outLines outputMode = iota
+	outCount
+	outListFiles
+	outListMissing
+	outQuiet
+)
+
+type nameMode int
+
+const (
+	nameAuto nameMode = iota
+	nameAlways
+	nameNever
+)
+
+const stdinLabel = "(standard input)"
+
 type grepper struct {
 	re         *regexp.Regexp
 	invert     bool
 	lineNumber bool
 	showName   bool
+	silent     bool
+	output     outputMode
+	maxCount   int
 	matched    bool
 	failed     bool
 }
@@ -56,6 +79,8 @@ var grepCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		invertMatch, _ := cmd.Flags().GetBool("invert-match")
 		lineNumber, _ := cmd.Flags().GetBool("line-number")
+		maxCount, _ := cmd.Flags().GetInt("max-count")
+		silent, _ := cmd.Flags().GetBool("no-messages")
 
 		patterns, fileArgs := grepPatterns(cmd, args)
 
@@ -65,10 +90,18 @@ var grepCmd = &cobra.Command{
 			os.Exit(grepError)
 		}
 
-		g := &grepper{re: re, invert: invertMatch, lineNumber: lineNumber}
+		g := &grepper{
+			re:         re,
+			invert:     invertMatch,
+			lineNumber: lineNumber,
+			output:     grepOutput(cmd),
+			maxCount:   maxCount,
+			silent:     silent,
+		}
 
 		if len(fileArgs) == 0 {
-			g.searchStream("", os.Stdin)
+			g.showName = grepNames(cmd, 1) == nameAlways
+			g.searchStream(stdinLabel, os.Stdin)
 		} else {
 			files, err := utils.ExpandGlobs(fileArgs)
 			if err != nil {
@@ -76,7 +109,7 @@ var grepCmd = &cobra.Command{
 				os.Exit(grepError)
 			}
 
-			g.showName = len(files) > 1
+			g.showName = grepNames(cmd, len(files)) == nameAlways
 			for _, path := range files {
 				g.searchFile(path)
 			}
@@ -101,6 +134,15 @@ func init() {
 	grepCmd.Flags().BoolP("fixed-strings", "F", false, "PATTERN is a set of newline-separated strings")
 	grepCmd.Flags().BoolP("word-regexp", "w", false, "match only whole words")
 	grepCmd.Flags().BoolP("line-regexp", "x", false, "match only whole lines")
+	grepCmd.Flags().BoolP("count", "c", false, "print only a count of matching lines per file")
+	grepCmd.Flags().BoolP("files-with-matches", "l", false, "print only names of files with matches")
+	grepCmd.Flags().BoolP("files-without-match", "L", false, "print only names of files without matches")
+	grepCmd.Flags().BoolP("quiet", "q", false, "suppress all normal output")
+	grepCmd.Flags().BoolP("no-messages", "s", false, "suppress error messages about missing files")
+	grepCmd.Flags().IntP("max-count", "m", 0, "stop after NUM selected lines per file")
+	grepCmd.Flags().BoolP("with-filename", "H", false, "print the file name for each match")
+	grepCmd.Flags().BoolP("no-filename", "h", false, "suppress the file name prefix")
+	grepCmd.Flags().Bool("help", false, "help for grep")
 }
 
 func grepKind(cmd *cobra.Command) patternKind {
@@ -194,10 +236,41 @@ func compilePatterns(patterns []string, kind patternKind, scope matchScope, fold
 	return regexp.Compile(expr)
 }
 
+func grepOutput(cmd *cobra.Command) outputMode {
+	flags := []struct {
+		name string
+		mode outputMode
+	}{
+		{"quiet", outQuiet},
+		{"files-with-matches", outListFiles},
+		{"files-without-match", outListMissing},
+		{"count", outCount},
+	}
+
+	for _, f := range flags {
+		if on, _ := cmd.Flags().GetBool(f.name); on {
+			return f.mode
+		}
+	}
+	return outLines
+}
+
+func grepNames(cmd *cobra.Command, fileCount int) nameMode {
+	if never, _ := cmd.Flags().GetBool("no-filename"); never {
+		return nameNever
+	}
+	if always, _ := cmd.Flags().GetBool("with-filename"); always || fileCount > 1 {
+		return nameAlways
+	}
+	return nameNever
+}
+
 func (g *grepper) searchFile(path string) {
 	f, err := os.Open(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "grep: %v\n", err)
+		if !g.silent {
+			fmt.Fprintf(os.Stderr, "grep: %v\n", err)
+		}
 		g.failed = true
 		return
 	}
@@ -208,7 +281,7 @@ func (g *grepper) searchFile(path string) {
 
 func (g *grepper) searchStream(name string, r io.Reader) {
 	scanner := utils.NewScanner(r)
-	lineNum := 0
+	lineNum, count := 0, 0
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
@@ -216,20 +289,52 @@ func (g *grepper) searchStream(name string, r io.Reader) {
 			continue
 		}
 
+		count++
 		g.matched = true
-		g.printLine(name, lineNum, line)
+		if g.output == outQuiet {
+			os.Exit(0)
+		}
+		if g.output == outLines {
+			g.printLine(name, lineNum, line)
+		}
+		if g.output == outListFiles || g.output == outListMissing {
+			break
+		}
+		if g.maxCount > 0 && count >= g.maxCount {
+			break
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "grep: reading input: %v\n", err)
+		if !g.silent {
+			fmt.Fprintf(os.Stderr, "grep: reading input: %v\n", err)
+		}
 		g.failed = true
+	}
+
+	g.finishStream(name, count)
+}
+
+func (g *grepper) finishStream(name string, count int) {
+	switch {
+	case g.output == outCount:
+		g.printPrefix(name)
+		fmt.Println(count)
+	case g.output == outListFiles && count > 0:
+		fmt.Println(name)
+	case g.output == outListMissing && count == 0:
+		fmt.Println(name)
+	}
+}
+
+func (g *grepper) printPrefix(name string) {
+	if g.showName {
+		fmt.Printf("%s:", name)
 	}
 }
 
 func (g *grepper) printLine(name string, lineNum int, line string) {
-	if g.showName {
-		fmt.Printf("%s:", name)
-	}
+	g.printPrefix(name)
 	if g.lineNumber {
 		fmt.Printf("%d:", lineNum)
 	}
