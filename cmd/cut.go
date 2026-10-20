@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -34,48 +35,21 @@ var cutCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if len(args) == 0 {
-			// Read from stdin when no files provided
-			scanner := utils.NewScanner(os.Stdin)
+		eachInput("cut", args, func(in input, r io.Reader) {
+			scanner := utils.NewScanner(r)
 			for scanner.Scan() {
 				line := scanner.Text()
 				if fields != "" {
 					printFields(line, delimiter, spans)
-				} else if characters != "" {
+				} else {
 					printCharacters(line, spans)
 				}
 			}
-		} else {
-			// Expand glob patterns in file argument
-			expandedFiles, err := utils.ExpandGlobs(args)
-			if err != nil {
-				warn("cut: %v\n", err)
-				return
+
+			if err := scanner.Err(); err != nil {
+				warn("cut: %s: %v\n", in.name, err)
 			}
-
-			for _, path := range expandedFiles {
-				file, err := os.Open(path)
-				if err != nil {
-					warn("cut: %v\n", err)
-					continue
-				}
-				defer file.Close()
-
-				scanner := utils.NewScanner(file)
-				for scanner.Scan() {
-					line := scanner.Text()
-					if fields != "" {
-						printFields(line, delimiter, spans)
-					} else if characters != "" {
-						printCharacters(line, spans)
-					}
-				}
-
-				if err := scanner.Err(); err != nil {
-					warn("cut: reading input: %v\n", err)
-				}
-			}
-		}
+		})
 	},
 }
 

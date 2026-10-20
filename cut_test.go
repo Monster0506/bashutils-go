@@ -65,3 +65,11 @@ func TestCutRejectsBadListOnce(t *testing.T) {
 		t.Errorf("want 1 error line, got %d: %q", n, r.stderr)
 	}
 }
+
+func TestCutDashReadsStdin(t *testing.T) {
+	got := run(t, "ab\n", "cut", "-c", "1", "-").stdout
+
+	if want := "a\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
