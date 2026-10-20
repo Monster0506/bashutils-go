@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
@@ -17,7 +16,7 @@ var headCmd = &cobra.Command{
 
 		if len(args) == 0 {
 			// Read from stdin when no files provided
-			scanner := bufio.NewScanner(os.Stdin)
+			scanner := utils.NewScanner(os.Stdin)
 			for i := 0; i < lines && scanner.Scan(); i++ {
 				fmt.Println(scanner.Text())
 			}
@@ -40,7 +39,7 @@ var headCmd = &cobra.Command{
 					continue
 				}
 				defer f.Close()
-				scanner := bufio.NewScanner(f)
+				scanner := utils.NewScanner(f)
 				for i := 0; i < lines && scanner.Scan(); i++ {
 					fmt.Println(scanner.Text())
 				}

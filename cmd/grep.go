@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
@@ -57,7 +56,7 @@ var grepCmd = &cobra.Command{
 		}
 
 		if len(fileArgs) == 0 {
-			scanner := bufio.NewScanner(os.Stdin)
+			scanner := utils.NewScanner(os.Stdin)
 			lineNum := 0
 			for scanner.Scan() {
 				lineNum++
@@ -88,7 +87,7 @@ var grepCmd = &cobra.Command{
 				}
 				defer file.Close()
 
-				scanner := bufio.NewScanner(file)
+				scanner := utils.NewScanner(file)
 				lineNum := 0
 				for scanner.Scan() {
 					lineNum++

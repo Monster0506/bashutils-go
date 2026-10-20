@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -140,7 +141,7 @@ items read from standard input.`,
 }
 
 func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error) {
-	scanner := bufio.NewScanner(os.Stdin)
+	scanner := utils.NewScanner(os.Stdin)
 	var items []string
 
 	if nullTerminated {

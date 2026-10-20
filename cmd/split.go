@@ -85,7 +85,7 @@ func generateSuffix(index int, numeric bool) string {
 }
 
 func splitByLines(inputFile *os.File, prefix string, linesPerFile int64, numericSuffixes bool) {
-	scanner := bufio.NewScanner(inputFile)
+	scanner := utils.NewScanner(inputFile)
 	fileIndex := 0
 	currentLineCount := int64(0)
 	var outputFile *os.File

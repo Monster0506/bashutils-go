@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 )
@@ -43,8 +44,14 @@ func ReadAllFromReader(r io.Reader) (string, error) {
 	return string(b), nil
 }
 
-func ReadLines(r io.Reader) ([]string, error) {
+func NewScanner(r io.Reader) *bufio.Scanner {
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(nil, math.MaxInt)
+	return scanner
+}
+
+func ReadLines(r io.Reader) ([]string, error) {
+	scanner := NewScanner(r)
 	lines := []string{}
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())

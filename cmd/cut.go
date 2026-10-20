@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
@@ -37,7 +36,7 @@ var cutCmd = &cobra.Command{
 
 		if len(args) == 0 {
 			// Read from stdin when no files provided
-			scanner := bufio.NewScanner(os.Stdin)
+			scanner := utils.NewScanner(os.Stdin)
 			for scanner.Scan() {
 				line := scanner.Text()
 				if fields != "" {
@@ -62,7 +61,7 @@ var cutCmd = &cobra.Command{
 				}
 				defer file.Close()
 
-				scanner := bufio.NewScanner(file)
+				scanner := utils.NewScanner(file)
 				for scanner.Scan() {
 					line := scanner.Text()
 					if fields != "" {

@@ -50,7 +50,7 @@ var pasteCmd = &cobra.Command{
 
 		files := make([]*os.File, len(expandedArgs))
 		scanners := make([]*bufio.Scanner, len(expandedArgs))
-		stdinScanner := bufio.NewScanner(os.Stdin)
+		stdinScanner := utils.NewScanner(os.Stdin)
 		for i, filePath := range expandedArgs {
 			if filePath == "-" {
 				files[i] = nil
@@ -63,7 +63,7 @@ var pasteCmd = &cobra.Command{
 				return
 			}
 			files[i] = file
-			scanners[i] = bufio.NewScanner(file)
+			scanners[i] = utils.NewScanner(file)
 		}
 		defer func() {
 			for _, file := range files {
