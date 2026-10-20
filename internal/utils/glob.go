@@ -2,9 +2,11 @@ package utils
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -17,7 +19,7 @@ func ExpandGlobs(args []string) ([]string, error) {
 	for _, arg := range args {
 		// Check if the argument contains any glob characters
 		if containsGlobChars(arg) {
-			matches, err := filepath.Glob(arg)
+			matches, err := globPattern(arg)
 			if err != nil {
 				return nil, fmt.Errorf("glob error for pattern %s: %v", arg, err)
 			}
@@ -43,6 +45,60 @@ func ExpandGlobs(args []string) ([]string, error) {
 // containsGlobChars checks if a string contains any glob pattern characters
 func containsGlobChars(s string) bool {
 	return strings.ContainsAny(s, "*?[")
+}
+
+func globPattern(pattern string) ([]string, error) {
+	segs := strings.Split(filepath.ToSlash(pattern), "/")
+	star := slices.Index(segs, "**")
+	if star < 0 {
+		return filepath.Glob(pattern)
+	}
+
+	base := strings.Join(segs[:star], "/")
+	if star == 0 {
+		base = "."
+	} else if base == "" {
+		base = "/"
+	}
+	rest := strings.Join(segs[star+1:], "/")
+
+	seen := map[string]bool{}
+	var matches []string
+	add := func(m string) {
+		if !seen[m] {
+			seen[m] = true
+			matches = append(matches, m)
+		}
+	}
+
+	err := filepath.WalkDir(base, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() {
+			if rest == "" {
+				add(p)
+			}
+			return nil
+		}
+		if p != base && strings.HasPrefix(d.Name(), ".") {
+			return filepath.SkipDir
+		}
+		if rest == "" {
+			return nil
+		}
+
+		found, err := globPattern(filepath.Join(p, rest))
+		if err != nil {
+			return err
+		}
+		for _, m := range found {
+			add(m)
+		}
+		return nil
+	})
+
+	return matches, err
 }
 
 // ExpandEnvironmentVariables expands both Unix-style ($VAR) and Windows-style (%VAR%) environment variables
