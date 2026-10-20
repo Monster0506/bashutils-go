@@ -75,16 +75,11 @@ func generateSuffix(index int, numeric bool) string {
 	if numeric {
 		return fmt.Sprintf("%02d", index) // Pad with leading zeros for consistency
 	}
-	// Mimic classic 'aa', 'ab', 'ac'... suffixes
 	const alphabet = "abcdefghijklmnopqrstuvwxyz"
+	const minWidth = 2
 	suf := ""
-	for {
+	for ; index > 0 || len(suf) < minWidth; index /= len(alphabet) {
 		suf = string(alphabet[index%len(alphabet)]) + suf
-		index = index / len(alphabet)
-		if index == 0 {
-			break
-		}
-		index-- // Adjust for 0-based indexing after division
 	}
 	return suf
 }
