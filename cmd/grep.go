@@ -2,12 +2,27 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/monster0506/bashutils-go/internal/utils"
+	"io"
 	"os"
 	"regexp"
 
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
 )
+
+const (
+	grepNoMatch = 1
+	grepError   = 2
+)
+
+type grepper struct {
+	re         *regexp.Regexp
+	invert     bool
+	lineNumber bool
+	showName   bool
+	matched    bool
+	failed     bool
+}
 
 var grepCmd = &cobra.Command{
 	Use:   "grep [pattern] [files...]",
@@ -28,7 +43,7 @@ var grepCmd = &cobra.Command{
 		} else {
 			if len(args) == 0 {
 				fmt.Fprintf(os.Stderr, "grep: missing pattern\n")
-				os.Exit(2)
+				os.Exit(grepError)
 			}
 			patternStr = args[0]
 			fileArgs = args[1:]
@@ -41,80 +56,31 @@ var grepCmd = &cobra.Command{
 		re, err := regexp.Compile(patternStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "grep: invalid regex pattern: %v\n", err)
-			os.Exit(2)
+			os.Exit(grepError)
 		}
 
-		matched := false
-		exitErr := false
-
-		printLine := func(lineNum int, line string) {
-			if lineNumber {
-				fmt.Printf("%d:%s\n", lineNum, line)
-			} else {
-				fmt.Println(line)
-			}
-		}
+		g := &grepper{re: re, invert: invertMatch, lineNumber: lineNumber}
 
 		if len(fileArgs) == 0 {
-			scanner := utils.NewScanner(os.Stdin)
-			lineNum := 0
-			for scanner.Scan() {
-				lineNum++
-				line := scanner.Text()
-				match := re.MatchString(line)
-				if (match && !invertMatch) || (!match && invertMatch) {
-					matched = true
-					printLine(lineNum, line)
-				}
-			}
+			g.searchStream("", os.Stdin)
 		} else {
-			expandedFiles, err := utils.ExpandGlobs(fileArgs)
+			files, err := utils.ExpandGlobs(fileArgs)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "grep: %v\n", err)
-				os.Exit(2)
+				os.Exit(grepError)
 			}
 
-			for _, path := range expandedFiles {
-				if len(expandedFiles) > 1 {
-					fmt.Printf("==> %s <==\n", path)
-				}
-
-				file, err := os.Open(path)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "grep: %v\n", err)
-					exitErr = true
-					continue
-				}
-				defer file.Close()
-
-				scanner := utils.NewScanner(file)
-				lineNum := 0
-				for scanner.Scan() {
-					lineNum++
-					line := scanner.Text()
-					match := re.MatchString(line)
-					if (match && !invertMatch) || (!match && invertMatch) {
-						matched = true
-						printLine(lineNum, line)
-					}
-				}
-
-				if err := scanner.Err(); err != nil {
-					fmt.Fprintf(os.Stderr, "grep: reading input: %v\n", err)
-					exitErr = true
-				}
-
-				if len(expandedFiles) > 1 && path != expandedFiles[len(expandedFiles)-1] {
-					fmt.Println()
-				}
+			g.showName = len(files) > 1
+			for _, path := range files {
+				g.searchFile(path)
 			}
 		}
 
-		if exitErr {
-			os.Exit(2)
+		if g.failed {
+			os.Exit(grepError)
 		}
-		if !matched {
-			os.Exit(1)
+		if !g.matched {
+			os.Exit(grepNoMatch)
 		}
 	},
 }
@@ -124,4 +90,46 @@ func init() {
 	grepCmd.Flags().BoolP("invert-match", "v", false, "select non-matching lines")
 	grepCmd.Flags().BoolP("line-number", "n", false, "show line numbers")
 	grepCmd.Flags().StringP("regexp", "e", "", "use a specific regex pattern")
+}
+
+func (g *grepper) searchFile(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "grep: %v\n", err)
+		g.failed = true
+		return
+	}
+	defer f.Close()
+
+	g.searchStream(path, f)
+}
+
+func (g *grepper) searchStream(name string, r io.Reader) {
+	scanner := utils.NewScanner(r)
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Text()
+		if g.re.MatchString(line) == g.invert {
+			continue
+		}
+
+		g.matched = true
+		g.printLine(name, lineNum, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "grep: reading input: %v\n", err)
+		g.failed = true
+	}
+}
+
+func (g *grepper) printLine(name string, lineNum int, line string) {
+	if g.showName {
+		fmt.Printf("%s:", name)
+	}
+	if g.lineNumber {
+		fmt.Printf("%d:", lineNum)
+	}
+	fmt.Println(line)
 }
