@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 var headCmd = &cobra.Command{
@@ -14,41 +15,18 @@ var headCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		lines, _ := cmd.Flags().GetInt("lines")
 
-		if len(args) == 0 {
-			// Read from stdin when no files provided
-			scanner := utils.NewScanner(os.Stdin)
+		eachInput("head", args, func(in input, r io.Reader) {
+			printHeader(in)
+
+			scanner := utils.NewScanner(r)
 			for i := 0; i < lines && scanner.Scan(); i++ {
 				fmt.Println(scanner.Text())
 			}
-		} else {
-			// Expand glob patterns in arguments
-			expandedArgs, err := utils.ExpandGlobs(args)
-			if err != nil {
-				warn("head: %v\n", err)
-				return
+
+			if err := scanner.Err(); err != nil {
+				warn("head: %s: %v\n", in.name, err)
 			}
-
-			for i, path := range expandedArgs {
-				if len(expandedArgs) > 1 {
-					fmt.Printf("==> %s <==\n", path)
-				}
-
-				f, err := os.Open(path)
-				if err != nil {
-					warn("head: %v\n", err)
-					continue
-				}
-				defer f.Close()
-				scanner := utils.NewScanner(f)
-				for i := 0; i < lines && scanner.Scan(); i++ {
-					fmt.Println(scanner.Text())
-				}
-
-				if i < len(expandedArgs)-1 {
-					fmt.Println()
-				}
-			}
-		}
+		})
 	},
 }
 

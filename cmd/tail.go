@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 var tailCmd = &cobra.Command{
@@ -14,9 +15,10 @@ var tailCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		n, _ := cmd.Flags().GetInt("lines")
 
-		if len(args) == 0 {
-			// Read from stdin when no files provided
-			scanner := utils.NewScanner(os.Stdin)
+		eachInput("tail", args, func(in input, r io.Reader) {
+			printHeader(in)
+
+			scanner := utils.NewScanner(r)
 			lines := []string{}
 			for scanner.Scan() {
 				lines = append(lines, scanner.Text())
@@ -24,45 +26,16 @@ var tailCmd = &cobra.Command{
 					lines = lines[1:]
 				}
 			}
-			for _, line := range lines {
-				fmt.Println(line)
-			}
-		} else {
-			// Expand glob patterns in arguments
-			expandedArgs, err := utils.ExpandGlobs(args)
-			if err != nil {
-				warn("tail: %v\n", err)
+
+			if err := scanner.Err(); err != nil {
+				warn("tail: %s: %v\n", in.name, err)
 				return
 			}
 
-			for i, path := range expandedArgs {
-				if len(expandedArgs) > 1 {
-					fmt.Printf("==> %s <==\n", path)
-				}
-
-				f, err := os.Open(path)
-				if err != nil {
-					warn("tail: %v\n", err)
-					continue
-				}
-				defer f.Close()
-				scanner := utils.NewScanner(f)
-				lines := []string{}
-				for scanner.Scan() {
-					lines = append(lines, scanner.Text())
-					if len(lines) > n {
-						lines = lines[1:]
-					}
-				}
-				for _, line := range lines {
-					fmt.Println(line)
-				}
-
-				if i < len(expandedArgs)-1 {
-					fmt.Println()
-				}
+			for _, line := range lines {
+				fmt.Println(line)
 			}
-		}
+		})
 	},
 }
 
