@@ -11,7 +11,7 @@ func TestXargsRejectsUnknownOption(t *testing.T) {
 }
 
 func TestXargsVerboseIgnoresChildArgs(t *testing.T) {
-	r := run(t, "x\n", "xargs", binPath, "echo", "--", "-t")
+	r := run(t, "x\n", "xargs", binPath, "echo", "-t")
 
 	if r.stdout != "-t x\n" || r.stderr != "" {
 		t.Fatalf("stdout %q, stderr %q", r.stdout, r.stderr)

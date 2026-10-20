@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
@@ -38,8 +39,11 @@ var echoCmd = &cobra.Command{
 		}
 
 		if opts.escapes {
-			out = strings.ReplaceAll(out, "\\n", "\n")
-			out = strings.ReplaceAll(out, "\\t", "\t")
+			var stop bool
+			out, stop = interpretEscapes(out)
+			if stop {
+				opts.suppressNewline = true
+			}
 		}
 
 		if opts.suppressNewline {
@@ -77,6 +81,69 @@ func parseEchoArgs(args []string) (echoOpts, []string) {
 		args = args[1:]
 	}
 	return o, args
+}
+
+var echoSimpleEscapes = map[byte]byte{
+	'\\': '\\',
+	'a':  '\a',
+	'b':  '\b',
+	'e':  0x1b,
+	'f':  '\f',
+	'n':  '\n',
+	'r':  '\r',
+	't':  '\t',
+	'v':  '\v',
+}
+
+func interpretEscapes(s string) (string, bool) {
+	var sb strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' || i+1 == len(s) {
+			sb.WriteByte(s[i])
+			continue
+		}
+
+		next := s[i+1]
+		switch {
+		case next == 'c':
+			return sb.String(), true
+		case next == '0':
+			b, used := parseNumber(s[i+2:], 8, 3)
+			sb.WriteByte(b)
+			i += 1 + used
+		case next == 'x':
+			b, used := parseNumber(s[i+2:], 16, 2)
+			if used == 0 {
+				sb.WriteString(`\x`)
+			} else {
+				sb.WriteByte(b)
+			}
+			i += 1 + used
+		default:
+			if esc, ok := echoSimpleEscapes[next]; ok {
+				sb.WriteByte(esc)
+			} else {
+				sb.WriteByte('\\')
+				sb.WriteByte(next)
+			}
+			i++
+		}
+	}
+	return sb.String(), false
+}
+
+func parseNumber(s string, base, maxDigits int) (byte, int) {
+	used := 0
+	value := 0
+	for used < len(s) && used < maxDigits {
+		d, err := strconv.ParseInt(s[used:used+1], base, 32)
+		if err != nil {
+			break
+		}
+		value = value*base + int(d)
+		used++
+	}
+	return byte(value), used
 }
 
 func isEchoFlags(a string) bool {
