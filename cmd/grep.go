@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
@@ -24,36 +25,41 @@ type grepper struct {
 	failed     bool
 }
 
+var grepExprs []string
+
+type patternKind int
+
+const (
+	kindRegex patternKind = iota
+	kindFixed
+)
+
+type matchScope int
+
+const (
+	scopeAny matchScope = iota
+	scopeWord
+	scopeLine
+)
+
+type caseMode int
+
+const (
+	matchCase caseMode = iota
+	foldCase
+)
+
 var grepCmd = &cobra.Command{
 	Use:   "grep [pattern] [files...]",
 	Short: "Print lines matching a pattern",
 	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		ignoreCase, _ := cmd.Flags().GetBool("ignore-case")
 		invertMatch, _ := cmd.Flags().GetBool("invert-match")
 		lineNumber, _ := cmd.Flags().GetBool("line-number")
-		regexpFlag, _ := cmd.Flags().GetString("regexp")
 
-		var patternStr string
-		var fileArgs []string
+		patterns, fileArgs := grepPatterns(cmd, args)
 
-		if cmd.Flags().Changed("regexp") {
-			patternStr = regexpFlag
-			fileArgs = args
-		} else {
-			if len(args) == 0 {
-				fmt.Fprintf(os.Stderr, "grep: missing pattern\n")
-				os.Exit(grepError)
-			}
-			patternStr = args[0]
-			fileArgs = args[1:]
-		}
-
-		if ignoreCase {
-			patternStr = "(?i)" + patternStr
-		}
-
-		re, err := regexp.Compile(patternStr)
+		re, err := compilePatterns(patterns, grepKind(cmd), grepScope(cmd), grepCase(cmd))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "grep: invalid regex pattern: %v\n", err)
 			os.Exit(grepError)
@@ -89,7 +95,103 @@ func init() {
 	grepCmd.Flags().BoolP("ignore-case", "i", false, "ignore case distinctions")
 	grepCmd.Flags().BoolP("invert-match", "v", false, "select non-matching lines")
 	grepCmd.Flags().BoolP("line-number", "n", false, "show line numbers")
-	grepCmd.Flags().StringP("regexp", "e", "", "use a specific regex pattern")
+	grepCmd.Flags().StringArrayVarP(&grepExprs, "regexp", "e", nil, "use PATTERN for matching (repeatable)")
+	grepCmd.Flags().StringP("file", "f", "", "take patterns from FILE, one per line")
+	grepCmd.Flags().BoolP("extended-regexp", "E", false, "PATTERN is an extended regular expression")
+	grepCmd.Flags().BoolP("fixed-strings", "F", false, "PATTERN is a set of newline-separated strings")
+	grepCmd.Flags().BoolP("word-regexp", "w", false, "match only whole words")
+	grepCmd.Flags().BoolP("line-regexp", "x", false, "match only whole lines")
+}
+
+func grepKind(cmd *cobra.Command) patternKind {
+	if fixed, _ := cmd.Flags().GetBool("fixed-strings"); fixed {
+		return kindFixed
+	}
+	return kindRegex
+}
+
+func grepScope(cmd *cobra.Command) matchScope {
+	if line, _ := cmd.Flags().GetBool("line-regexp"); line {
+		return scopeLine
+	}
+	if word, _ := cmd.Flags().GetBool("word-regexp"); word {
+		return scopeWord
+	}
+	return scopeAny
+}
+
+func grepCase(cmd *cobra.Command) caseMode {
+	if fold, _ := cmd.Flags().GetBool("ignore-case"); fold {
+		return foldCase
+	}
+	return matchCase
+}
+
+func grepPatterns(cmd *cobra.Command, args []string) ([]string, []string) {
+	exprs := grepExprs
+	file, _ := cmd.Flags().GetString("file")
+
+	if !cmd.Flags().Changed("regexp") && !cmd.Flags().Changed("file") {
+		if len(args) == 0 {
+			fmt.Fprintf(os.Stderr, "grep: missing pattern\n")
+			os.Exit(grepError)
+		}
+		exprs = []string{args[0]}
+		args = args[1:]
+	}
+
+	var patterns []string
+	for _, e := range exprs {
+		patterns = append(patterns, strings.Split(e, "\n")...)
+	}
+
+	if file != "" {
+		lines, err := readPatternFile(file)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "grep: %v\n", err)
+			os.Exit(grepError)
+		}
+		patterns = append(patterns, lines...)
+	}
+
+	return patterns, args
+}
+
+func readPatternFile(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	return utils.ReadLines(f)
+}
+
+func compilePatterns(patterns []string, kind patternKind, scope matchScope, fold caseMode) (*regexp.Regexp, error) {
+	if len(patterns) == 0 {
+		return regexp.Compile(`[^\s\S]`)
+	}
+
+	parts := make([]string, len(patterns))
+	for i, p := range patterns {
+		if kind == kindFixed {
+			p = regexp.QuoteMeta(p)
+		}
+		parts[i] = "(?:" + p + ")"
+	}
+
+	expr := strings.Join(parts, "|")
+	switch scope {
+	case scopeWord:
+		expr = `\b(?:` + expr + `)\b`
+	case scopeLine:
+		expr = `^(?:` + expr + `)$`
+	}
+	if fold == foldCase {
+		expr = "(?i)" + expr
+	}
+
+	return regexp.Compile(expr)
 }
 
 func (g *grepper) searchFile(path string) {

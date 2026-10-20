@@ -45,3 +45,35 @@ func TestGrepEmptyPatternViaE(t *testing.T) {
 		t.Fatalf("code %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
 	}
 }
+
+func TestGrepPatternModes(t *testing.T) {
+	cases := []struct {
+		in   string
+		args []string
+		want string
+	}{
+		{"a.b\naxb\n", []string{"-F", "a.b"}, "a.b\n"},
+		{"a\nb\nc\n", []string{"-E", "a|b"}, "a\nb\n"},
+		{"foo bar\nfoobar\n", []string{"-w", "foo"}, "foo bar\n"},
+		{"foo\nfoo bar\n", []string{"-x", "foo"}, "foo\n"},
+		{"a\nb\nc\n", []string{"-e", "a", "-e", "c"}, "a\nc\n"},
+		{"A\nb\n", []string{"-i", "-F", "a"}, "A\n"},
+	}
+
+	for _, c := range cases {
+		got := run(t, c.in, append([]string{"grep"}, c.args...)...).stdout
+		if got != c.want {
+			t.Errorf("grep %v: got %q, want %q", c.args, got, c.want)
+		}
+	}
+}
+
+func TestGrepPatternFile(t *testing.T) {
+	pats := writeFile(t, "pats.txt", "a\nc\n")
+
+	got := run(t, "a\nb\nc\n", "grep", "-f", pats).stdout
+
+	if want := "a\nc\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
