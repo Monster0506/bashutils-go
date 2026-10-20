@@ -76,35 +76,61 @@ func init() {
 	cutCmd.Flags().StringP("characters", "c", "", "select character positions (e.g. '1-5,7')")
 }
 
-func parseRanges(input string) ([]int, error) {
+const openEnd = -1
+
+type span struct {
+	start, end int
+}
+
+func parseRanges(input string) ([]span, error) {
+	var spans []span
+	for _, part := range strings.Split(input, ",") {
+		first, last, isRange := strings.Cut(part, "-")
+
+		if !isRange {
+			idx, err := strconv.Atoi(first)
+			if err != nil {
+				return nil, err
+			}
+			spans = append(spans, span{idx, idx})
+			continue
+		}
+
+		start := 1
+		if first != "" {
+			n, err := strconv.Atoi(first)
+			if err != nil {
+				return nil, err
+			}
+			start = n
+		}
+
+		end := openEnd
+		if last != "" {
+			n, err := strconv.Atoi(last)
+			if err != nil {
+				return nil, err
+			}
+			end = n
+		}
+
+		spans = append(spans, span{start, end})
+	}
+	return spans, nil
+}
+
+func indicesFor(spans []span, n int) []int {
 	var indices []int
-	parts := strings.Split(input, ",")
-	for _, part := range parts {
-		if strings.Contains(part, "-") {
-			rangeParts := strings.Split(part, "-")
-			start, err := strconv.Atoi(rangeParts[0])
-			if err != nil {
-				return nil, err
-			}
-			end := start
-			if len(rangeParts) > 1 {
-				end, err = strconv.Atoi(rangeParts[1])
-				if err != nil {
-					return nil, err
-				}
-			}
-			for i := start; i <= end; i++ {
-				indices = append(indices, i)
-			}
-		} else {
-			idx, err := strconv.Atoi(part)
-			if err != nil {
-				return nil, err
-			}
-			indices = append(indices, idx)
+	for _, s := range spans {
+		end := s.end
+		if end == openEnd || end > n {
+			end = n
+		}
+		for i := max(s.start, 1); i <= end; i++ {
+			indices = append(indices, i)
 		}
 	}
-	return indices, nil
+	return indices
 }
 
 func printFields(line, delimiter, fields string) {
@@ -114,23 +140,21 @@ func printFields(line, delimiter, fields string) {
 	}
 
 	parts := strings.Split(line, delimiter)
-	fieldIndices, err := parseRanges(fields)
+	spans, err := parseRanges(fields)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cut: invalid field list: %v\n", err)
 		return
 	}
 
 	var selectedFields []string
-	for _, idx := range fieldIndices {
-		if idx > 0 && idx <= len(parts) {
-			selectedFields = append(selectedFields, parts[idx-1]) // 1-based index
-		}
+	for _, idx := range indicesFor(spans, len(parts)) {
+		selectedFields = append(selectedFields, parts[idx-1])
 	}
 	fmt.Println(strings.Join(selectedFields, delimiter))
 }
 
 func printCharacters(line, characters string) {
-	charIndices, err := parseRanges(characters)
+	spans, err := parseRanges(characters)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cut: invalid character list: %v\n", err)
 		return
@@ -138,10 +162,8 @@ func printCharacters(line, characters string) {
 
 	runes := []rune(line)
 	var selectedChars []rune
-	for _, idx := range charIndices {
-		if idx > 0 && idx <= len(runes) {
-			selectedChars = append(selectedChars, runes[idx-1]) // 1-based index
-		}
+	for _, idx := range indicesFor(spans, len(runes)) {
+		selectedChars = append(selectedChars, runes[idx-1])
 	}
 	fmt.Println(string(selectedChars))
 }
