@@ -24,3 +24,22 @@ func TestCRLFIsPreserved(t *testing.T) {
 		}
 	}
 }
+
+func TestMissingFinalNewlineIsPreserved(t *testing.T) {
+	cases := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"head"}, "a\nb"},
+		{[]string{"tail"}, "a\nb"},
+		{[]string{"head", "-n", "1"}, "a\n"},
+		{[]string{"tail", "-n", "1"}, "b"},
+	}
+
+	for _, c := range cases {
+		got := run(t, "a\nb", c.args...).stdout
+		if got != c.want {
+			t.Errorf("%v: got %q, want %q", c.args, got, c.want)
+		}
+	}
+}

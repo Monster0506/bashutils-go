@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
@@ -49,7 +48,7 @@ var pasteCmd = &cobra.Command{
 		}
 
 		files := make([]*os.File, len(expandedArgs))
-		scanners := make([]*bufio.Scanner, len(expandedArgs))
+		scanners := make([]*utils.LineScanner, len(expandedArgs))
 		stdinScanner := utils.NewScanner(os.Stdin)
 		for i, filePath := range expandedArgs {
 			if filePath == "-" {

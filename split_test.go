@@ -83,3 +83,15 @@ func TestSplitBytesRejectsZero(t *testing.T) {
 		t.Fatalf("names %v, stderr %q", names, r.stderr)
 	}
 }
+
+func TestSplitLinesKeepsMissingFinalNewline(t *testing.T) {
+	src := writeFile(t, "in.txt", "a\nb")
+	dir := t.TempDir()
+
+	run(t, "", "split", "-l", "1", src, filepath.Join(dir, "p"))
+
+	_, joined := splitOutputs(t, dir, "p")
+	if joined != "a\nb" {
+		t.Fatalf("got %q", joined)
+	}
+}

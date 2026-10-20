@@ -60,3 +60,10 @@ func printHeader(in input) {
 	}
 	fmt.Printf("==> %s <==\n", in.name)
 }
+
+func printLine(s *utils.LineScanner) {
+	fmt.Print(s.Text())
+	if !s.Unterminated() {
+		fmt.Println()
+	}
+}

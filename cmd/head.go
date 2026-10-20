@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
@@ -20,7 +19,7 @@ var headCmd = &cobra.Command{
 
 			scanner := utils.NewScanner(r)
 			for i := 0; i < lines && scanner.Scan(); i++ {
-				fmt.Println(scanner.Text())
+				printLine(scanner)
 			}
 
 			if err := scanner.Err(); err != nil {

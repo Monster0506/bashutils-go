@@ -109,7 +109,10 @@ func splitByLines(inputFile *os.File, prefix string, linesPerFile int64, numeric
 			fileIndex++
 		}
 
-		_, err = outputWriter.WriteString(scanner.Text() + "\n")
+		_, err = outputWriter.WriteString(scanner.Text())
+		if err == nil && !scanner.Unterminated() {
+			err = outputWriter.WriteByte('\n')
+		}
 		if err != nil {
 			warn("split: writing to output file: %v\n", err)
 			return

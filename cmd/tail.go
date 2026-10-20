@@ -32,7 +32,11 @@ var tailCmd = &cobra.Command{
 				return
 			}
 
-			for _, line := range lines {
+			for i, line := range lines {
+				if i == len(lines)-1 && scanner.Unterminated() {
+					fmt.Print(line)
+					continue
+				}
 				fmt.Println(line)
 			}
 		})
