@@ -125,7 +125,7 @@ func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error)
 		var currentItem strings.Builder
 		for scanner.Scan() {
 			if scanner.Text() == "\x00" {
-				items = append(items, strings.TrimSpace(currentItem.String()))
+				items = append(items, currentItem.String())
 				currentItem.Reset()
 			} else {
 				currentItem.WriteString(scanner.Text())
@@ -133,7 +133,7 @@ func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error)
 		}
 		// Add the last item if it doesn't end with null
 		if currentItem.Len() > 0 {
-			items = append(items, strings.TrimSpace(currentItem.String()))
+			items = append(items, currentItem.String())
 		}
 	} else if delimiter != "" {
 		// Read items separated by custom delimiter
@@ -141,7 +141,7 @@ func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error)
 		var currentItem strings.Builder
 		for scanner.Scan() {
 			if scanner.Text() == delimiter {
-				items = append(items, strings.TrimSpace(currentItem.String()))
+				items = append(items, currentItem.String())
 				currentItem.Reset()
 			} else {
 				currentItem.WriteString(scanner.Text())
@@ -149,7 +149,7 @@ func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error)
 		}
 		// Add the last item
 		if currentItem.Len() > 0 {
-			items = append(items, strings.TrimSpace(currentItem.String()))
+			items = append(items, currentItem.String())
 		}
 	} else {
 		// Read items separated by whitespace/newlines

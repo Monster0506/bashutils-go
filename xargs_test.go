@@ -25,3 +25,22 @@ func TestXargsVerbosePrintsOnlyCommandLine(t *testing.T) {
 		t.Fatalf("stderr %q, want %q", r.stderr, want)
 	}
 }
+
+func TestXargsKeepsWhitespaceInDelimitedItems(t *testing.T) {
+	cases := []struct {
+		in   string
+		flag []string
+	}{
+		{" a \x00b\x00", []string{"-0"}},
+		{" a ,b,", []string{"-d", ","}},
+	}
+
+	for _, c := range cases {
+		args := append(append([]string{"xargs"}, c.flag...), binPath, "echo", "-n")
+		got := run(t, c.in, args...).stdout
+
+		if want := " a  b"; got != want {
+			t.Errorf("%v: got %q, want %q", c.flag, got, want)
+		}
+	}
+}
