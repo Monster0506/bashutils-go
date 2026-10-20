@@ -32,6 +32,7 @@ counterpart, with a focus on simplicity and portability.
 
 Currently supported commands:
 
+*   **`cal`**: Display a calendar.
 *   **`cat`**: Concatenate files and print on the standard output.
 *   **`cut`**: Remove sections from each line of files.
 *   **`echo`**: Display a line of text.
@@ -69,7 +70,7 @@ All commands that accept file arguments now support bash-like glob patterns:
 
 ### Prerequisites
 
-*   Go 1.16+ installed ([Download Go](https://golang.org/dl/))
+*   Go 1.22+ installed ([Download Go](https://golang.org/dl/))
 *   `GOPATH` configured and added to your system's `PATH` environment variable.
 
 ### Building and Installing
