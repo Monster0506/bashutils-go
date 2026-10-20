@@ -206,7 +206,7 @@ func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error)
 		var currentItem strings.Builder
 		for scanner.Scan() {
 			if scanner.Text() == delimiter {
-				items = append(items, currentItem.String())
+				items = append(items, trimCR(currentItem.String(), delimiter))
 				currentItem.Reset()
 			} else {
 				currentItem.WriteString(scanner.Text())
@@ -214,7 +214,7 @@ func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error)
 		}
 		// Add the last item
 		if currentItem.Len() > 0 {
-			items = append(items, currentItem.String())
+			items = append(items, trimCR(currentItem.String(), delimiter))
 		}
 	} else {
 		// Read items separated by whitespace/newlines
@@ -231,6 +231,13 @@ func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error)
 	}
 
 	return items, scanner.Err()
+}
+
+func trimCR(item, delimiter string) string {
+	if delimiter == "\n" {
+		return strings.TrimSuffix(item, "\r")
+	}
+	return item
 }
 
 func executeCommand(command []string, args []string, replaceStr string, verbose bool) {

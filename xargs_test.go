@@ -128,3 +128,11 @@ func TestXargsNoRunIfEmptySkipsCommand(t *testing.T) {
 		t.Fatalf("stdout %q, code %d", r.stdout, r.code)
 	}
 }
+
+func TestXargsReplaceStripsCarriageReturns(t *testing.T) {
+	got := run(t, "a\r\nb\r\n", "xargs", "-I", "{}", "echo", "[{}]").stdout
+
+	if want := "[a]\n[b]\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
