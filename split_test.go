@@ -48,3 +48,38 @@ func TestSplitFixedWidthSuffixes(t *testing.T) {
 		t.Fatalf("sorted pieces do not reassemble the input")
 	}
 }
+
+func TestSplitBytesTerminates(t *testing.T) {
+	src := writeFile(t, "in.txt", "abcdefghij")
+	dir := t.TempDir()
+
+	run(t, "", "split", "-b", "4", src, filepath.Join(dir, "p"))
+
+	names, joined := splitOutputs(t, dir, "p")
+	if len(names) != 3 || joined != "abcdefghij" {
+		t.Fatalf("names %v, joined %q", names, joined)
+	}
+}
+
+func TestSplitBytesFromStdin(t *testing.T) {
+	dir := t.TempDir()
+
+	run(t, "abcdefghij", "split", "-b", "4", "-", filepath.Join(dir, "p"))
+
+	names, joined := splitOutputs(t, dir, "p")
+	if len(names) != 3 || joined != "abcdefghij" {
+		t.Fatalf("names %v, joined %q", names, joined)
+	}
+}
+
+func TestSplitBytesRejectsZero(t *testing.T) {
+	src := writeFile(t, "in.txt", "abc")
+	dir := t.TempDir()
+
+	r := run(t, "", "split", "-b", "0", src, filepath.Join(dir, "p"))
+
+	names, _ := splitOutputs(t, dir, "p")
+	if len(names) != 0 || r.stderr == "" {
+		t.Fatalf("names %v, stderr %q", names, r.stderr)
+	}
+}

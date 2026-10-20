@@ -156,6 +156,9 @@ func parseBytesString(bytesStr string) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("invalid byte size format: %s", bytesStr)
 	}
+	if value <= 0 {
+		return 0, fmt.Errorf("invalid byte size: %s", bytesStr)
+	}
 	return value * multiplier, nil
 }
 
@@ -166,65 +169,33 @@ func splitByBytes(inputFile *os.File, prefix string, bytesPerFileStr string, num
 		return
 	}
 
-	fileIndex := 0
-	buffer := make([]byte, 4096) // Use a common buffer size
-	var outputFile *os.File
-	var errClose error
-
-	for {
-		if outputFile == nil {
-			suffix := generateSuffix(fileIndex, numericSuffixes)
-			outputFileName := prefix + suffix
-			outputFile, err = os.Create(outputFileName)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "split: creating output file: %v\n", err)
-				return
-			}
-			fileIndex++
-		}
-
-		bytesReadThisFile := int64(0)
-		for bytesReadThisFile < bytesPerFile {
-			bytesToRead := min(int64(len(buffer)), bytesPerFile-bytesReadThisFile)
-
-			n, err := inputFile.Read(buffer[:bytesToRead])
-			if n > 0 {
-				_, writeErr := outputFile.Write(buffer[:n])
-				if writeErr != nil {
-					fmt.Fprintf(os.Stderr, "split: writing to output file: %v\n", writeErr)
-					return
-				}
-				bytesReadThisFile += int64(n)
-			}
-			if err == io.EOF {
-				break // End of input file
-			}
-			if err != nil {
+	reader := bufio.NewReader(inputFile)
+	for fileIndex := 0; ; fileIndex++ {
+		if _, err := reader.Peek(1); err != nil {
+			if err != io.EOF {
 				fmt.Fprintf(os.Stderr, "split: reading input: %v\n", err)
-				return
 			}
-		}
-
-		if outputFile != nil {
-			errClose = outputFile.Close()
-			if errClose != nil {
-				fmt.Fprintf(os.Stderr, "split: closing output file: %v\n", errClose)
-				return
-			}
-			outputFile = nil // Reset for next file
-		}
-
-		_, err = inputFile.Seek(0, io.SeekCurrent) // Check if EOF reached after closing and seeking
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Fprintf(os.Stderr, "split: seeking input: %v\n", err)
 			return
 		}
-		// If bytesReadThisFile < bytesPerFile and it's not EOF, it means we've read all available data.
-		if bytesReadThisFile == 0 && err == io.EOF {
-			break // No more data to read from the input file
+
+		outputFile, err := os.Create(prefix + generateSuffix(fileIndex, numericSuffixes))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "split: creating output file: %v\n", err)
+			return
+		}
+
+		_, copyErr := io.CopyN(outputFile, reader, bytesPerFile)
+		if err := outputFile.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "split: closing output file: %v\n", err)
+			return
+		}
+
+		if copyErr == io.EOF {
+			return
+		}
+		if copyErr != nil {
+			fmt.Fprintf(os.Stderr, "split: copying to output file: %v\n", copyErr)
+			return
 		}
 	}
 }

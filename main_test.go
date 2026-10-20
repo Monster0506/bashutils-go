@@ -2,13 +2,17 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
+
+const runTimeout = 10 * time.Second
 
 var binPath string
 
@@ -39,7 +43,10 @@ type result struct {
 func run(t *testing.T, stdin string, args ...string) result {
 	t.Helper()
 
-	cmd := exec.Command(binPath, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binPath, args...)
 	cmd.Stdin = strings.NewReader(stdin)
 
 	var stdout, stderr bytes.Buffer
