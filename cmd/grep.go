@@ -37,15 +37,16 @@ const (
 const stdinLabel = "(standard input)"
 
 type grepper struct {
-	re         *regexp.Regexp
-	invert     bool
-	lineNumber bool
-	showName   bool
-	silent     bool
-	output     outputMode
-	maxCount   int
-	matched    bool
-	failed     bool
+	re           *regexp.Regexp
+	invert       bool
+	lineNumber   bool
+	showName     bool
+	silent       bool
+	onlyMatching bool
+	output       outputMode
+	maxCount     int
+	matched      bool
+	failed       bool
 }
 
 var grepExprs []string
@@ -81,6 +82,7 @@ var grepCmd = &cobra.Command{
 		lineNumber, _ := cmd.Flags().GetBool("line-number")
 		maxCount, _ := cmd.Flags().GetInt("max-count")
 		silent, _ := cmd.Flags().GetBool("no-messages")
+		onlyMatching, _ := cmd.Flags().GetBool("only-matching")
 
 		patterns, fileArgs := grepPatterns(cmd, args)
 
@@ -91,12 +93,13 @@ var grepCmd = &cobra.Command{
 		}
 
 		g := &grepper{
-			re:         re,
-			invert:     invertMatch,
-			lineNumber: lineNumber,
-			output:     grepOutput(cmd),
-			maxCount:   maxCount,
-			silent:     silent,
+			re:           re,
+			invert:       invertMatch,
+			lineNumber:   lineNumber,
+			output:       grepOutput(cmd),
+			maxCount:     maxCount,
+			silent:       silent,
+			onlyMatching: onlyMatching,
 		}
 
 		if len(fileArgs) == 0 {
@@ -143,6 +146,7 @@ func init() {
 	grepCmd.Flags().BoolP("with-filename", "H", false, "print the file name for each match")
 	grepCmd.Flags().BoolP("no-filename", "h", false, "suppress the file name prefix")
 	grepCmd.Flags().Bool("help", false, "help for grep")
+	grepCmd.Flags().BoolP("only-matching", "o", false, "print only the matched parts of a line")
 }
 
 func grepKind(cmd *cobra.Command) patternKind {
@@ -295,7 +299,7 @@ func (g *grepper) searchStream(name string, r io.Reader) {
 			os.Exit(0)
 		}
 		if g.output == outLines {
-			g.printLine(name, lineNum, line)
+			g.emit(name, lineNum, line)
 		}
 		if g.output == outListFiles || g.output == outListMissing {
 			break
@@ -339,4 +343,17 @@ func (g *grepper) printLine(name string, lineNum int, line string) {
 		fmt.Printf("%d:", lineNum)
 	}
 	fmt.Println(line)
+}
+
+func (g *grepper) emit(name string, lineNum int, line string) {
+	if !g.onlyMatching || g.invert {
+		g.printLine(name, lineNum, line)
+		return
+	}
+
+	for _, m := range g.re.FindAllString(line, -1) {
+		if m != "" {
+			g.printLine(name, lineNum, m)
+		}
+	}
 }

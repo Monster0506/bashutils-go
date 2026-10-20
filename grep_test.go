@@ -117,3 +117,22 @@ func TestGrepSilentSuppressesMissingFileErrors(t *testing.T) {
 		t.Fatalf("stderr %q, code %d", r.stderr, r.code)
 	}
 }
+
+func TestGrepOnlyMatching(t *testing.T) {
+	cases := []struct {
+		in   string
+		args []string
+		want string
+	}{
+		{"abac\n", []string{"-o", "a."}, "ab\nac\n"},
+		{"x\nabac\n", []string{"-on", "a."}, "2:ab\n2:ac\n"},
+		{"abc\n", []string{"-o", "z"}, ""},
+	}
+
+	for _, c := range cases {
+		got := run(t, c.in, append([]string{"grep"}, c.args...)...).stdout
+		if got != c.want {
+			t.Errorf("grep %v: got %q, want %q", c.args, got, c.want)
+		}
+	}
+}
