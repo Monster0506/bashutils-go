@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
@@ -181,6 +183,10 @@ func (o *xargsOpts) apply(letter rune, value string, hasValue bool, rest []strin
 }
 
 func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error) {
+	if !nullTerminated && delimiter == "" {
+		return readQuotedItems(os.Stdin)
+	}
+
 	scanner := utils.NewScanner(os.Stdin)
 	var items []string
 
@@ -216,18 +222,6 @@ func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error)
 		if currentItem.Len() > 0 {
 			items = append(items, trimCR(currentItem.String(), delimiter))
 		}
-	} else {
-		// Read items separated by whitespace/newlines
-		for scanner.Scan() {
-			line := scanner.Text()
-			// Split by whitespace and add non-empty items
-			fields := strings.Fields(line)
-			for _, field := range fields {
-				if field != "" {
-					items = append(items, field)
-				}
-			}
-		}
 	}
 
 	return items, scanner.Err()
@@ -240,6 +234,63 @@ func trimCR(item, delimiter string) string {
 	return item
 }
 
+var errUnmatchedQuote = errors.New("unmatched quote")
+
+func readQuotedItems(r io.Reader) ([]string, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var items []string
+	var cur strings.Builder
+	var quote rune
+	inItem := false
+	runes := []rune(string(data))
+
+	for i := 0; i < len(runes); i++ {
+		c := runes[i]
+		switch {
+		case quote != 0:
+			if c == '\n' {
+				return nil, errUnmatchedQuote
+			}
+			if c == quote {
+				quote = 0
+				continue
+			}
+			cur.WriteRune(c)
+		case c == '\\' && i+1 < len(runes) && isEscapable(runes[i+1]):
+			inItem = true
+			i++
+			cur.WriteRune(runes[i])
+		case c == '\'' || c == '"':
+			quote = c
+			inItem = true
+		case unicode.IsSpace(c):
+			if inItem {
+				items = append(items, cur.String())
+				cur.Reset()
+				inItem = false
+			}
+		default:
+			cur.WriteRune(c)
+			inItem = true
+		}
+	}
+
+	if quote != 0 {
+		return nil, errUnmatchedQuote
+	}
+	if inItem {
+		items = append(items, cur.String())
+	}
+	return items, nil
+}
+
+func isEscapable(r rune) bool {
+	return r == '\'' || r == '"' || unicode.IsSpace(r)
+}
 func executeCommand(command []string, args []string, replaceStr string, verbose bool) {
 	if replaceStr != "" {
 		for _, arg := range args {

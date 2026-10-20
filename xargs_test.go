@@ -136,3 +136,27 @@ func TestXargsReplaceStripsCarriageReturns(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestXargsHonorsQuotesAndBackslashes(t *testing.T) {
+	got := run(t, "'a b' \"c d\" e\\ f g\n", "xargs", "-n", "1", "echo").stdout
+
+	if want := "a b\nc d\ne f\ng\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestXargsRejectsUnmatchedQuote(t *testing.T) {
+	r := run(t, "'a b\n", "xargs", "echo")
+
+	if r.code == 0 || r.stdout != "" || r.stderr == "" {
+		t.Fatalf("code %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
+	}
+}
+
+func TestXargsKeepsBackslashesInPaths(t *testing.T) {
+	got := run(t, "C:\\Users\\me \\\\srv\\share\n", "xargs", "-n", "1", "echo").stdout
+
+	if want := "C:\\Users\\me\n\\\\srv\\share\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
