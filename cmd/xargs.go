@@ -70,15 +70,8 @@ items read from standard input.`,
 				// This is the start of the command - take everything from here
 				commandArgs = args[i:]
 				commandFound = true
-				if verbose {
-					fmt.Fprintf(os.Stderr, "Command args: %v\n", commandArgs)
-				}
 				break
 			}
-		}
-
-		if verbose {
-			fmt.Fprintf(os.Stderr, "After parsing, commandArgs: %v\n", commandArgs)
 		}
 
 		// Read items from stdin
@@ -105,9 +98,6 @@ items read from standard input.`,
 		}
 
 		// Execute commands
-		if verbose {
-			fmt.Fprintf(os.Stderr, "About to execute with commandArgs: %v\n", commandArgs)
-		}
 		if maxArgs > 0 {
 			// Split items into chunks of maxArgs
 			for i := 0; i < len(items); i += maxArgs {
@@ -200,16 +190,13 @@ func executeCommand(command []string, args []string, replaceStr string, verbose 
 		var finalArgs []string
 		finalArgs = append(finalArgs, command...)
 		finalArgs = append(finalArgs, args...)
-		if verbose {
-			fmt.Fprintf(os.Stderr, "Final command: %v\n", finalArgs)
-		}
 		executeSingleCommand(finalArgs, verbose)
 	}
 }
 
 func executeSingleCommand(args []string, verbose bool) {
 	if verbose {
-		fmt.Fprintf(os.Stderr, "Executing: %s\n", strings.Join(args, " "))
+		fmt.Fprintln(os.Stderr, strings.Join(args, " "))
 	}
 
 	// Check if the first argument is "bashutils" and handle it specially

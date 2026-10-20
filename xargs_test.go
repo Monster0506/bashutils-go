@@ -17,3 +17,11 @@ func TestXargsVerboseIgnoresChildArgs(t *testing.T) {
 		t.Fatalf("stdout %q, stderr %q", r.stdout, r.stderr)
 	}
 }
+
+func TestXargsVerbosePrintsOnlyCommandLine(t *testing.T) {
+	r := run(t, "x\n", "xargs", "-t", binPath, "echo")
+
+	if want := binPath + " echo x\n"; r.stderr != want {
+		t.Fatalf("stderr %q, want %q", r.stderr, want)
+	}
+}
