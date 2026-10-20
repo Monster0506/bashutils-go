@@ -13,70 +13,85 @@ var trCmd = &cobra.Command{
 	Use:   "tr [SET1] [SET2]",
 	Short: "Translate or delete characters",
 	Args:  cobra.RangeArgs(1, 2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		deleteMode, _ := cmd.Flags().GetBool("delete")
 		complement, _ := cmd.Flags().GetBool("complement")
 
 		if deleteMode && len(args) == 2 {
-			fmt.Fprintf(os.Stderr, "tr: extra operand '%s'\n", args[1])
-			os.Exit(1)
+			return fail(1, "tr: extra operand '%s'", args[1])
 		}
 
-		set1 := expandCharSet(args[0])
-		var set2 []rune
+		t := &translator{
+			set1:       expandCharSet(args[0]),
+			delete:     deleteMode,
+			complement: complement,
+		}
 		if len(args) == 2 {
-			set2 = expandCharSet(args[1])
+			t.set2 = expandCharSet(args[1])
+		}
+		t.index = make(map[rune]int, len(t.set1))
+		for i, r := range t.set1 {
+			if _, seen := t.index[r]; !seen {
+				t.index[r] = i
+			}
 		}
 
-		index := make(map[rune]int, len(set1))
-		for i, r := range set1 {
-			if _, seen := index[r]; !seen {
-				index[r] = i
-			}
+		if err := t.run(os.Stdin); err != nil {
+			return fail(1, "tr: reading input: %v", err)
 		}
-
-		inputReader := bufio.NewReader(os.Stdin)
-		for {
-			r, _, err := inputReader.ReadRune()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "tr: reading input: %v\n", err)
-				os.Exit(1)
-			}
-
-			idx, inSet := index[r]
-
-			if deleteMode {
-				if inSet == complement {
-					fmt.Print(string(r))
-				}
-				continue
-			}
-
-			if complement {
-				if inSet {
-					fmt.Print(string(r))
-					continue
-				}
-				if len(set2) > 0 {
-					fmt.Print(string(set2[len(set2)-1]))
-				}
-				continue
-			}
-
-			if !inSet {
-				fmt.Print(string(r))
-				continue
-			}
-			if idx < len(set2) {
-				fmt.Print(string(set2[idx]))
-			} else if len(set2) > 0 {
-				fmt.Print(string(set2[len(set2)-1]))
-			}
-		}
+		return nil
 	},
+}
+
+type translator struct {
+	set1       []rune
+	set2       []rune
+	index      map[rune]int
+	delete     bool
+	complement bool
+}
+
+func (t *translator) run(r io.Reader) error {
+	reader := bufio.NewReader(r)
+	for {
+		c, _, err := reader.ReadRune()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		if out, keep := t.mapRune(c); keep {
+			fmt.Print(string(out))
+		}
+	}
+}
+
+func (t *translator) mapRune(r rune) (rune, bool) {
+	idx, inSet := t.index[r]
+	switch {
+	case t.delete:
+		return r, inSet == t.complement
+	case t.complement:
+		if inSet {
+			return r, true
+		}
+		return t.last()
+	case !inSet:
+		return r, true
+	case idx < len(t.set2):
+		return t.set2[idx], true
+	default:
+		return t.last()
+	}
+}
+
+func (t *translator) last() (rune, bool) {
+	if len(t.set2) == 0 {
+		return 0, false
+	}
+	return t.set2[len(t.set2)-1], true
 }
 
 func init() {
