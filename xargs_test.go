@@ -160,3 +160,19 @@ func TestXargsKeepsBackslashesInPaths(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestXargsDelimiterMustBeSingleCharacter(t *testing.T) {
+	r := run(t, "a,,b", "xargs", "-d", ",,", "echo")
+
+	if r.code == 0 || r.stdout != "" || r.stderr == "" {
+		t.Fatalf("code %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
+	}
+}
+
+func TestXargsDelimiterEscapes(t *testing.T) {
+	got := run(t, "a\tb\tc", "xargs", "-d", `\t`, "-n", "1", "echo").stdout
+
+	if want := "a\nb\nc\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}

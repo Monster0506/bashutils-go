@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -24,32 +25,23 @@ with double or single quotes or a backslash) or newlines, and executes the comma
 items read from standard input.`,
 	Args:               cobra.ArbitraryArgs,
 	DisableFlagParsing: true,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		opts, commandArgs, err := parseXargsArgs(args)
 		if errors.Is(err, errXargsHelp) {
-			cmd.Help()
-			return
+			return cmd.Help()
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "xargs: %v\n", err)
-			os.Exit(1)
+			return fail(1, "xargs: %v", err)
 		}
 
-		maxArgs := opts.maxArgs
-		replaceStr := opts.replace
-		nullTerminated := opts.null
 		delimiter := opts.delimiter
-		noRunIfEmpty := opts.noRun
-		verbose := opts.verbose
-
-		if replaceStr != "" && !nullTerminated && delimiter == "" {
+		if opts.replace != "" && !opts.null && delimiter == "" {
 			delimiter = "\n"
 		}
 
-		items, err := readItemsFromStdin(nullTerminated, delimiter)
+		items, err := readItems(os.Stdin, opts.null, delimiter)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "xargs: error reading input: %v\n", err)
-			os.Exit(1)
+			return fail(1, "xargs: error reading input: %v", err)
 		}
 
 		if len(commandArgs) == 0 {
@@ -57,21 +49,21 @@ items read from standard input.`,
 		}
 
 		if len(items) == 0 {
-			if noRunIfEmpty {
-				return
+			if !opts.noRun {
+				executeCommand(commandArgs, nil, opts.replace, opts.verbose)
 			}
-			executeCommand(commandArgs, nil, replaceStr, verbose)
-			return
+			return nil
 		}
 
-		if maxArgs > 0 {
-			for i := 0; i < len(items); i += maxArgs {
-				end := min(i+maxArgs, len(items))
-				executeCommand(commandArgs, items[i:end], replaceStr, verbose)
-			}
-		} else {
-			executeCommand(commandArgs, items, replaceStr, verbose)
+		batch := len(items)
+		if opts.maxArgs > 0 {
+			batch = opts.maxArgs
 		}
+		for i := 0; i < len(items); i += batch {
+			end := min(i+batch, len(items))
+			executeCommand(commandArgs, items[i:end], opts.replace, opts.verbose)
+		}
+		return nil
 	},
 }
 
@@ -166,7 +158,11 @@ func (o *xargsOpts) apply(letter rune, value string, hasValue bool, rest []strin
 	case 'I':
 		o.replace = value
 	case 'd':
-		o.delimiter = value
+		d, err := singleDelimiter(value)
+		if err != nil {
+			return 0, err
+		}
+		o.delimiter = d
 	case '0':
 		o.null = true
 	case 'r':
@@ -182,49 +178,51 @@ func (o *xargsOpts) apply(letter rune, value string, hasValue bool, rest []strin
 	return used, nil
 }
 
-func readItemsFromStdin(nullTerminated bool, delimiter string) ([]string, error) {
-	if !nullTerminated && delimiter == "" {
-		return readQuotedItems(os.Stdin)
-	}
-
-	scanner := utils.NewScanner(os.Stdin)
-	var items []string
-
+func readItems(r io.Reader, nullTerminated bool, delimiter string) ([]string, error) {
 	if nullTerminated {
-		// Read null-terminated items
-		scanner.Split(bufio.ScanBytes)
-		var currentItem strings.Builder
-		for scanner.Scan() {
-			if scanner.Text() == "\x00" {
-				items = append(items, currentItem.String())
-				currentItem.Reset()
-			} else {
-				currentItem.WriteString(scanner.Text())
-			}
-		}
-		// Add the last item if it doesn't end with null
-		if currentItem.Len() > 0 {
-			items = append(items, currentItem.String())
-		}
-	} else if delimiter != "" {
-		// Read items separated by custom delimiter
-		scanner.Split(bufio.ScanBytes)
-		var currentItem strings.Builder
-		for scanner.Scan() {
-			if scanner.Text() == delimiter {
-				items = append(items, trimCR(currentItem.String(), delimiter))
-				currentItem.Reset()
-			} else {
-				currentItem.WriteString(scanner.Text())
-			}
-		}
-		// Add the last item
-		if currentItem.Len() > 0 {
-			items = append(items, trimCR(currentItem.String(), delimiter))
-		}
+		delimiter = "\x00"
+	}
+	if delimiter == "" {
+		return readQuotedItems(r)
 	}
 
+	scanner := utils.NewScanner(r)
+	scanner.Split(splitOnByte(delimiter[0]))
+
+	var items []string
+	for scanner.Scan() {
+		items = append(items, trimCR(scanner.Text(), delimiter))
+	}
 	return items, scanner.Err()
+}
+
+func splitOnByte(delim byte) bufio.SplitFunc {
+	return func(data []byte, atEOF bool) (int, []byte, error) {
+		if i := bytes.IndexByte(data, delim); i >= 0 {
+			return i + 1, data[:i], nil
+		}
+		if atEOF && len(data) > 0 {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	}
+}
+
+var delimiterArgEscapes = map[string]string{
+	`\n`: "\n",
+	`\t`: "\t",
+	`\0`: "\x00",
+	`\\`: "\\",
+}
+
+func singleDelimiter(value string) (string, error) {
+	if d, ok := delimiterArgEscapes[value]; ok {
+		return d, nil
+	}
+	if len(value) != 1 {
+		return "", fmt.Errorf("delimiter must be a single byte, got %q", value)
+	}
+	return value, nil
 }
 
 func trimCR(item, delimiter string) string {
