@@ -49,8 +49,7 @@ func warn(format string, args ...any) {
 }
 
 func Execute() {
-	dispatchByName()
-
+	rootCmd.SetArgs(normalizeArgs(invocationArgs()))
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
 	os.Exit(exitCode(rootCmd.Execute()))
@@ -73,18 +72,50 @@ func exitCode(err error) int {
 	return ee.code
 }
 
-func dispatchByName() {
+func invocationArgs() []string {
 	base := filepath.Base(os.Args[0])
 	name := strings.ToLower(strings.TrimSuffix(base, filepath.Ext(base)))
 
 	for _, c := range rootCmd.Commands() {
-		if c.Name() != name {
-			continue
+		if c.Name() == name {
+			return append([]string{name}, os.Args[1:]...)
 		}
-
-		rootCmd.SetArgs(append([]string{name}, os.Args[1:]...))
-		return
 	}
+	return os.Args[1:]
+}
+
+var numericOptionCmds = map[string]bool{"head": true, "tail": true}
+
+func normalizeArgs(args []string) []string {
+	if len(args) == 0 || !numericOptionCmds[args[0]] {
+		return args
+	}
+
+	out := []string{args[0]}
+	expectValue := false
+	for i := 1; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case expectValue:
+			expectValue = false
+		case a == "--" || !strings.HasPrefix(a, "-") || a == "-":
+			return append(out, args[i:]...)
+		case isNumericOption(a):
+			out = append(out, "-n", a[1:])
+			continue
+		default:
+			expectValue = a == "-n" || a == "-c"
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+func isNumericOption(a string) bool {
+	if len(a) < 2 || a[0] != '-' {
+		return false
+	}
+	return strings.Trim(a[1:], "0123456789") == ""
 }
 
 func init() {

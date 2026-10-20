@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/monster0506/bashutils-go/internal/utils"
+	"github.com/spf13/cobra"
 )
 
 const stdinName = "standard input"
@@ -105,8 +106,26 @@ func readLines(cmdName string, args []string) []string {
 	return all
 }
 
-func printHeader(in input) {
-	if in.count < 2 {
+type headerMode int
+
+const (
+	headerAuto headerMode = iota
+	headerAlways
+	headerNever
+)
+
+func headerModeOf(cmd *cobra.Command) headerMode {
+	if quiet, _ := cmd.Flags().GetBool("quiet"); quiet {
+		return headerNever
+	}
+	if verbose, _ := cmd.Flags().GetBool("verbose"); verbose {
+		return headerAlways
+	}
+	return headerAuto
+}
+
+func printHeader(in input, mode headerMode) {
+	if mode == headerNever || (mode == headerAuto && in.count < 2) {
 		return
 	}
 
