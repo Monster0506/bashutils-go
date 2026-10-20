@@ -73,15 +73,11 @@ items read from standard input.`,
 				cmd.Help()
 				return
 			default:
-				// If it starts with - but isn't a recognized flag, it might be part of the command
-				if strings.HasPrefix(arg, "-") {
-					// Check if it's a short flag that might be part of the command
-					if len(arg) == 2 && arg[1] != '-' {
-						// This could be a command flag, so treat everything from here as command args
-						commandArgs = args[i:]
-						break
-					}
+				if strings.HasPrefix(arg, "-") && arg != "-" {
+					fmt.Fprintf(os.Stderr, "xargs: invalid option -- '%s'\n", arg)
+					os.Exit(1)
 				}
+
 				// This is the start of the command - take everything from here
 				commandArgs = args[i:]
 				commandFound = true
