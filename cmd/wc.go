@@ -2,164 +2,47 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"io"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
-	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
 )
+
+type wcCount struct {
+	label  string
+	values map[string]int
+}
+
+var wcColumns = []string{"lines", "words", "chars", "bytes"}
 
 var wcCmd = &cobra.Command{
 	Use:   "wc [files...]",
 	Short: "Print newline, word, byte, and char counts for each file",
 	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		showLines, _ := cmd.Flags().GetBool("lines")
-		showWords, _ := cmd.Flags().GetBool("words")
-		showBytes, _ := cmd.Flags().GetBool("bytes")
-		showChars, _ := cmd.Flags().GetBool("chars")
-
-		if !showLines && !showWords && !showBytes && !showChars {
-			showLines, showWords, showBytes = true, true, true
+		var selected []string
+		for _, name := range wcColumns {
+			if on, _ := cmd.Flags().GetBool(name); on {
+				selected = append(selected, name)
+			}
+		}
+		if len(selected) == 0 {
+			selected = []string{"lines", "words", "bytes"}
 		}
 
-		var totalLines, totalWords, totalBytes, totalChars int
-		var validFiles []string
-		var allCounts []struct {
-			lines, words, bytes, chars int
-			path                       string
-		}
-
-		type fileEntry struct {
-			path string
-			data []byte
-		}
-		var entries []fileEntry
-
-		if len(args) == 0 {
-			data, err := utils.ReadAllFromReader(os.Stdin)
+		var counts []wcCount
+		eachInput("wc", args, func(in input, r io.Reader) {
+			data, err := io.ReadAll(r)
 			if err != nil {
-				warn("wc: %v\n", err)
+				warn("wc: %s: %v\n", in.name, err)
 				return
 			}
-			entries = append(entries, fileEntry{"", []byte(data)})
-		} else {
-			expandedArgs, err := utils.ExpandGlobs(args)
-			if err != nil {
-				warn("wc: %v\n", err)
-				return
-			}
-			for _, path := range expandedArgs {
-				data, err := os.ReadFile(path)
-				if err != nil {
-					warn("wc: %v\n", err)
-					continue
-				}
-				entries = append(entries, fileEntry{path, data})
-			}
-		}
+			counts = append(counts, countText(in.label, data))
+		})
 
-		// First pass: collect all counts
-		for _, entry := range entries {
-			data := entry.data
-			path := entry.path
-			validFiles = append(validFiles, path)
-
-			content := string(data)
-			lines := strings.Count(content, "\n")
-			words := len(strings.Fields(content))
-			bytes := len(data)
-
-			chars := utf8.RuneCountInString(content)
-
-			totalLines += lines
-			totalWords += words
-			totalBytes += bytes
-			totalChars += chars
-
-			allCounts = append(allCounts, struct {
-				lines, words, bytes, chars int
-				path                       string
-			}{lines, words, bytes, chars, path})
-		}
-
-		// Determine column widths (for alignment)
-		maxLinesWidth := 1
-		maxWordsWidth := 1
-		maxBytesWidth := 1
-		maxCharsWidth := 1
-
-		for _, count := range allCounts {
-			if len(fmt.Sprintf("%d", count.lines)) > maxLinesWidth {
-				maxLinesWidth = len(fmt.Sprintf("%d", count.lines))
-			}
-			if len(fmt.Sprintf("%d", count.words)) > maxWordsWidth {
-				maxWordsWidth = len(fmt.Sprintf("%d", count.words))
-			}
-			if len(fmt.Sprintf("%d", count.bytes)) > maxBytesWidth {
-				maxBytesWidth = len(fmt.Sprintf("%d", count.bytes))
-			}
-			if len(fmt.Sprintf("%d", count.chars)) > maxCharsWidth {
-				maxCharsWidth = len(fmt.Sprintf("%d", count.chars))
-			}
-		}
-
-		// Same thing for totals
-		if len(fmt.Sprintf("%d", totalLines)) > maxLinesWidth {
-			maxLinesWidth = len(fmt.Sprintf("%d", totalLines))
-		}
-		if len(fmt.Sprintf("%d", totalWords)) > maxWordsWidth {
-			maxWordsWidth = len(fmt.Sprintf("%d", totalWords))
-		}
-		if len(fmt.Sprintf("%d", totalBytes)) > maxBytesWidth {
-			maxBytesWidth = len(fmt.Sprintf("%d", totalBytes))
-		}
-		if len(fmt.Sprintf("%d", totalChars)) > maxCharsWidth {
-			maxCharsWidth = len(fmt.Sprintf("%d", totalChars))
-		}
-
-		// Print per-file stats
-		for _, count := range allCounts {
-			out := []string{}
-			if showLines {
-				out = append(out, fmt.Sprintf("%*d", maxLinesWidth, count.lines))
-			}
-			if showWords {
-				out = append(out, fmt.Sprintf("%*d", maxWordsWidth, count.words))
-			}
-			if showBytes {
-				out = append(out, fmt.Sprintf("%*d", maxBytesWidth, count.bytes))
-			}
-			if showChars {
-				out = append(out, fmt.Sprintf("%*d", maxCharsWidth, count.chars))
-			}
-
-			suffix := ""
-			if count.path != "" {
-				suffix = " " + count.path
-			}
-			fmt.Printf("%s%s\n", strings.Join(out, " "), suffix)
-		}
-
-		// Print totals if multiple files
-		if len(validFiles) > 1 {
-			out := []string{}
-			if showLines {
-				out = append(out, fmt.Sprintf("%*d", maxLinesWidth, totalLines))
-			}
-			if showWords {
-				out = append(out, fmt.Sprintf("%*d", maxWordsWidth, totalWords))
-			}
-			if showBytes {
-				out = append(out, fmt.Sprintf("%*d", maxBytesWidth, totalBytes))
-			}
-			if showChars {
-				out = append(out, fmt.Sprintf("%*d", maxCharsWidth, totalChars))
-			}
-
-			fmt.Printf("%s total\n", strings.Join(out, " "))
-		}
+		printCounts(counts, selected)
 	},
 }
 
@@ -168,4 +51,52 @@ func init() {
 	wcCmd.Flags().BoolP("words", "w", false, "print word count")
 	wcCmd.Flags().BoolP("bytes", "c", false, "print byte count")
 	wcCmd.Flags().BoolP("chars", "m", false, "print character count")
+}
+
+func countText(label string, data []byte) wcCount {
+	text := string(data)
+	return wcCount{
+		label: label,
+		values: map[string]int{
+			"lines": strings.Count(text, "\n"),
+			"words": len(strings.Fields(text)),
+			"chars": utf8.RuneCountInString(text),
+			"bytes": len(data),
+		},
+	}
+}
+
+func printCounts(counts []wcCount, selected []string) {
+	rows := counts
+	if len(counts) > 1 {
+		rows = append(rows, totalOf(counts, selected))
+	}
+
+	widths := make(map[string]int, len(selected))
+	for _, row := range rows {
+		for _, name := range selected {
+			widths[name] = max(widths[name], len(strconv.Itoa(row.values[name])))
+		}
+	}
+
+	for _, row := range rows {
+		cells := make([]string, 0, len(selected)+1)
+		for _, name := range selected {
+			cells = append(cells, fmt.Sprintf("%*d", widths[name], row.values[name]))
+		}
+		if row.label != "" {
+			cells = append(cells, row.label)
+		}
+		fmt.Println(strings.Join(cells, " "))
+	}
+}
+
+func totalOf(counts []wcCount, selected []string) wcCount {
+	total := wcCount{label: "total", values: map[string]int{}}
+	for _, c := range counts {
+		for _, name := range selected {
+			total.values[name] += c.values[name]
+		}
+	}
+	return total
 }

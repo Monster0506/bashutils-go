@@ -12,12 +12,14 @@ const stdinName = "standard input"
 
 type input struct {
 	name  string
+	label string
 	index int
 	count int
 }
 
 func eachInput(cmdName string, args []string, fn func(in input, r io.Reader)) {
-	if len(args) == 0 {
+	implicit := len(args) == 0
+	if implicit {
 		args = []string{"-"}
 	}
 
@@ -28,9 +30,12 @@ func eachInput(cmdName string, args []string, fn func(in input, r io.Reader)) {
 	}
 
 	for i, path := range paths {
-		in := input{name: path, index: i, count: len(paths)}
+		in := input{name: path, label: path, index: i, count: len(paths)}
 		if path == "-" {
 			in.name = stdinName
+			if implicit {
+				in.label = ""
+			}
 			fn(in, os.Stdin)
 			continue
 		}
