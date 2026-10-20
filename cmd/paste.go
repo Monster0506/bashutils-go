@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/monster0506/bashutils-go/internal/utils"
+	"io"
 	"os"
 	"strings"
 
+	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +14,7 @@ var pasteCmd = &cobra.Command{
 	Use:   "paste [files...]",
 	Short: "Merge lines from files",
 	Args:  cobra.ArbitraryArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		delimitersStr, _ := cmd.Flags().GetString("delimiters")
 		serial, _ := cmd.Flags().GetBool("serial")
 
@@ -23,89 +24,79 @@ var pasteCmd = &cobra.Command{
 		}
 
 		if serial {
-			warn("paste: --serial flag is not yet implemented.\n")
-			os.Exit(1)
-			return
+			return fail(1, "paste: --serial flag is not yet implemented")
 		}
 
-		if len(args) == 0 {
-			args = []string{"-"}
+		scanners, closeAll, err := openScanners(resolveInputs("paste", args, reportErrors))
+		defer closeAll()
+		if err != nil {
+			return err
 		}
 
-		// Expand glob patterns, but preserve "-" entries
-		var expandedArgs []string
-		for _, arg := range args {
-			if arg == "-" {
-				expandedArgs = append(expandedArgs, "-")
-				continue
-			}
-			expanded, err := utils.ExpandGlobs([]string{arg})
-			if err != nil {
-				warn("paste: %v\n", err)
-				return
-			}
-			expandedArgs = append(expandedArgs, expanded...)
-		}
-
-		files := make([]*os.File, len(expandedArgs))
-		scanners := make([]*utils.LineScanner, len(expandedArgs))
-		stdinScanner := utils.NewScanner(os.Stdin)
-		for i, filePath := range expandedArgs {
-			if filePath == "-" {
-				files[i] = nil
-				scanners[i] = stdinScanner
-				continue
-			}
-			file, err := os.Open(filePath)
-			if err != nil {
-				warn("paste: %v\n", err)
-				return
-			}
-			files[i] = file
-			scanners[i] = utils.NewScanner(file)
-		}
-		defer func() {
-			for _, file := range files {
-				if file != nil {
-					file.Close()
-				}
-			}
-		}()
-
-		var currentLines []string
 		moreData := true
 		for moreData {
-			currentLines = make([]string, len(scanners))
+			currentLines := make([]string, len(scanners))
 			moreData = false
 			for i, scanner := range scanners {
 				if scanner.Scan() {
 					currentLines[i] = scanner.Text()
 					moreData = true
-				} else {
-					if err := scanner.Err(); err != nil {
-						warn("paste: reading input: %v\n", err)
-						return
-					}
-					currentLines[i] = "" // Pad with empty string if file finished
+					continue
+				}
+				if err := scanner.Err(); err != nil {
+					return fail(1, "paste: reading input: %v", err)
 				}
 			}
-			if moreData {
-				var outputBuilder strings.Builder
-				for i, line := range currentLines {
-					outputBuilder.WriteString(line)
-					if i < len(currentLines)-1 {
-						outputBuilder.WriteString(delimiters[i%len(delimiters)])
-					}
-				}
-				fmt.Println(outputBuilder.String())
+
+			if !moreData {
+				break
 			}
+
+			var out strings.Builder
+			for i, line := range currentLines {
+				out.WriteString(line)
+				if i < len(currentLines)-1 {
+					out.WriteString(delimiters[i%len(delimiters)])
+				}
+			}
+			fmt.Println(out.String())
 		}
+		return nil
 	},
 }
 
 func init() {
 	pasteCmd.Flags().StringP("delimiters", "d", "", "use specified delimiters instead of TAB")
 	pasteCmd.Flags().BoolP("serial", "s", false, "paste one file at a time instead of in parallel (not yet implemented)")
+}
+
+func openScanners(inputs []input) ([]*utils.LineScanner, func(), error) {
+	var closers []io.Closer
+	closeAll := func() {
+		for _, c := range closers {
+			c.Close()
+		}
+	}
+
+	var stdin *utils.LineScanner
+	scanners := make([]*utils.LineScanner, len(inputs))
+	for i, in := range inputs {
+		if in.name == stdinName {
+			if stdin == nil {
+				stdin = utils.NewScanner(os.Stdin)
+			}
+			scanners[i] = stdin
+			continue
+		}
+
+		f := openInput("paste", in, reportErrors)
+		if f == nil {
+			return nil, closeAll, exitWith(1)
+		}
+		closers = append(closers, f)
+		scanners[i] = utils.NewScanner(f)
+	}
+	return scanners, closeAll, nil
 }
 
 var delimiterEscapes = map[rune]string{
