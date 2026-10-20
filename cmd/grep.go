@@ -37,7 +37,7 @@ var grepCmd = &cobra.Command{
 		var patternStr string
 		var fileArgs []string
 
-		if regexpFlag != "" {
+		if cmd.Flags().Changed("regexp") {
 			patternStr = regexpFlag
 			fileArgs = args
 		} else {

@@ -37,3 +37,11 @@ func TestGrepMissingFileAmongOthers(t *testing.T) {
 		t.Fatalf("code %d, stdout %q", r.code, r.stdout)
 	}
 }
+
+func TestGrepEmptyPatternViaE(t *testing.T) {
+	r := run(t, "a\nb\n", "grep", "-e", "")
+
+	if r.code != 0 || r.stdout != "a\nb\n" {
+		t.Fatalf("code %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
+	}
+}
