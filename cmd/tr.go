@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -18,25 +17,22 @@ var trCmd = &cobra.Command{
 		deleteMode, _ := cmd.Flags().GetBool("delete")
 		complement, _ := cmd.Flags().GetBool("complement")
 
-		set1 := args[0]
-		set2 := ""
-		if len(args) == 2 {
-			set2 = args[1]
-		}
-
-		// Error if delete mode but two sets provided
 		if deleteMode && len(args) == 2 {
-			fmt.Fprintf(os.Stderr, "tr: extra operand '%s'\n", set2)
+			fmt.Fprintf(os.Stderr, "tr: extra operand '%s'\n", args[1])
 			os.Exit(1)
 		}
 
-		expandedSet1 := expandCharSet(set1)
-		expandedSet2 := expandCharSet(set2)
-		set2Runes := []rune(expandedSet2)
+		set1 := expandCharSet(args[0])
+		var set2 []rune
+		if len(args) == 2 {
+			set2 = expandCharSet(args[1])
+		}
 
-		set1Map := make(map[rune]bool)
-		for _, r := range expandedSet1 {
-			set1Map[r] = true
+		index := make(map[rune]int, len(set1))
+		for i, r := range set1 {
+			if _, seen := index[r]; !seen {
+				index[r] = i
+			}
 		}
 
 		inputReader := bufio.NewReader(os.Stdin)
@@ -50,33 +46,34 @@ var trCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
+			idx, inSet := index[r]
+
 			if deleteMode {
-				if set1Map[r] == complement {
+				if inSet == complement {
 					fmt.Print(string(r))
 				}
 				continue
 			}
 
 			if complement {
-				if set1Map[r] {
+				if inSet {
 					fmt.Print(string(r))
 					continue
 				}
-				if len(set2Runes) > 0 {
-					fmt.Print(string(set2Runes[len(set2Runes)-1]))
+				if len(set2) > 0 {
+					fmt.Print(string(set2[len(set2)-1]))
 				}
 				continue
 			}
 
-			idx := strings.IndexRune(expandedSet1, r)
-			if idx == -1 {
+			if !inSet {
 				fmt.Print(string(r))
 				continue
 			}
-			if idx < len(expandedSet2) {
-				fmt.Print(string(expandedSet2[idx]))
-			} else if len(expandedSet2) > 0 {
-				fmt.Print(string(expandedSet2[len(expandedSet2)-1]))
+			if idx < len(set2) {
+				fmt.Print(string(set2[idx]))
+			} else if len(set2) > 0 {
+				fmt.Print(string(set2[len(set2)-1]))
 			}
 		}
 	},
@@ -87,7 +84,7 @@ func init() {
 	trCmd.Flags().BoolP("complement", "c", false, "use complement of SET1")
 }
 
-func expandCharSet(set string) string {
+func expandCharSet(set string) []rune {
 	var expanded []rune
 	runes := []rune(set)
 
@@ -109,5 +106,5 @@ func expandCharSet(set string) string {
 		}
 	}
 
-	return string(expanded)
+	return expanded
 }
