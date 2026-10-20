@@ -25,15 +25,25 @@ var cutCmd = &cobra.Command{
 			return
 		}
 
+		list := fields
+		if list == "" {
+			list = characters
+		}
+		spans, err := parseRanges(list)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cut: invalid list %q: %v\n", list, err)
+			os.Exit(1)
+		}
+
 		if len(args) == 0 {
 			// Read from stdin when no files provided
 			scanner := bufio.NewScanner(os.Stdin)
 			for scanner.Scan() {
 				line := scanner.Text()
 				if fields != "" {
-					printFields(line, delimiter, fields)
+					printFields(line, delimiter, spans)
 				} else if characters != "" {
-					printCharacters(line, characters)
+					printCharacters(line, spans)
 				}
 			}
 		} else {
@@ -56,9 +66,9 @@ var cutCmd = &cobra.Command{
 				for scanner.Scan() {
 					line := scanner.Text()
 					if fields != "" {
-						printFields(line, delimiter, fields)
+						printFields(line, delimiter, spans)
 					} else if characters != "" {
-						printCharacters(line, characters)
+						printCharacters(line, spans)
 					}
 				}
 
@@ -140,18 +150,13 @@ func indicesFor(spans []span, n int) []int {
 	return indices
 }
 
-func printFields(line, delimiter, fields string) {
+func printFields(line, delimiter string, spans []span) {
 	if !strings.Contains(line, delimiter) {
 		fmt.Println(line)
 		return
 	}
 
 	parts := strings.Split(line, delimiter)
-	spans, err := parseRanges(fields)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cut: invalid field list: %v\n", err)
-		return
-	}
 
 	var selectedFields []string
 	for _, idx := range indicesFor(spans, len(parts)) {
@@ -160,13 +165,7 @@ func printFields(line, delimiter, fields string) {
 	fmt.Println(strings.Join(selectedFields, delimiter))
 }
 
-func printCharacters(line, characters string) {
-	spans, err := parseRanges(characters)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cut: invalid character list: %v\n", err)
-		return
-	}
-
+func printCharacters(line string, spans []span) {
 	runes := []rune(line)
 	var selectedChars []rune
 	for _, idx := range indicesFor(spans, len(runes)) {

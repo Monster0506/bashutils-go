@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCutKeepsLinesWithoutDelimiter(t *testing.T) {
 	got := run(t, "abc\na,b\n", "cut", "-d", ",", "-f", "2").stdout
@@ -46,5 +49,19 @@ func TestCutOutputsInInputOrderWithoutDuplicates(t *testing.T) {
 		if got != c.want {
 			t.Errorf("cut %v: got %q, want %q", c.args, got, c.want)
 		}
+	}
+}
+
+func TestCutRejectsBadListOnce(t *testing.T) {
+	r := run(t, "a\nb\nc\n", "cut", "-f", "x")
+
+	if r.code == 0 {
+		t.Error("expected non-zero exit code")
+	}
+	if r.stdout != "" {
+		t.Errorf("unexpected stdout %q", r.stdout)
+	}
+	if n := strings.Count(r.stderr, "\n"); n != 1 {
+		t.Errorf("want 1 error line, got %d: %q", n, r.stderr)
 	}
 }
