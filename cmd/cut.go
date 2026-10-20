@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 
@@ -15,14 +14,13 @@ var cutCmd = &cobra.Command{
 	Use:   "cut [files...]",
 	Short: "Extract specific columns or byte ranges from lines",
 	Args:  cobra.ArbitraryArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		fields, _ := cmd.Flags().GetString("fields")
 		delimiter, _ := cmd.Flags().GetString("delimiter")
 		characters, _ := cmd.Flags().GetString("characters")
 
 		if (fields == "" && characters == "") || (fields != "" && characters != "") {
-			warn("cut: specify either --fields or --characters\n")
-			return
+			return fail(1, "cut: specify either --fields or --characters")
 		}
 
 		list := fields
@@ -31,8 +29,7 @@ var cutCmd = &cobra.Command{
 		}
 		spans, err := parseRanges(list)
 		if err != nil {
-			warn("cut: invalid list %q: %v\n", list, err)
-			os.Exit(1)
+			return fail(1, "cut: invalid list %q: %v", list, err)
 		}
 
 		eachInput("cut", args, func(in input, r io.Reader) {
@@ -50,6 +47,7 @@ var cutCmd = &cobra.Command{
 				warn("cut: %s: %v\n", in.name, err)
 			}
 		})
+		return nil
 	},
 }
 

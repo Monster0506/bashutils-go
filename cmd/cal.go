@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -17,35 +16,32 @@ var calCmd = &cobra.Command{
 If no arguments are given, the current month is displayed.
 If only the year is given, the full year is displayed.`,
 	Args: cobra.RangeArgs(0, 2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		now := time.Now()
 		month := int(now.Month())
 		year := now.Year()
 
 		if len(args) == 1 {
-			// One arg: full year
 			y, err := strconv.Atoi(args[0])
 			if err != nil || y < 1 {
-				fmt.Fprintf(os.Stderr, "cal: invalid year: %s\n", args[0])
-				os.Exit(1)
+				return fail(1, "cal: invalid year: %s", args[0])
 			}
 			printYear(y)
-			return
+			return nil
 		}
 
 		if len(args) == 2 {
-			// Two args: month + year
 			m, err1 := strconv.Atoi(args[0])
 			y, err2 := strconv.Atoi(args[1])
 			if err1 != nil || err2 != nil || m < 1 || m > 12 || y < 1 {
-				fmt.Fprintf(os.Stderr, "cal: invalid date: %s %s\n", args[0], args[1])
-				os.Exit(1)
+				return fail(1, "cal: invalid date: %s %s", args[0], args[1])
 			}
 			month = m
 			year = y
 		}
 
 		printMonth(month, year)
+		return nil
 	},
 }
 

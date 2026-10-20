@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,6 +19,30 @@ var rootCmd = &cobra.Command{
 
 var exitStatus int
 
+type exitError struct {
+	code int
+	err  error
+}
+
+func (e *exitError) Error() string {
+	if e.err == nil {
+		return ""
+	}
+	return e.err.Error()
+}
+
+func (e *exitError) Unwrap() error {
+	return e.err
+}
+
+func fail(code int, format string, args ...any) error {
+	return &exitError{code: code, err: fmt.Errorf(format, args...)}
+}
+
+func exitWith(code int) error {
+	return &exitError{code: code}
+}
+
 func warn(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, format, args...)
 	exitStatus = 1
@@ -26,11 +51,26 @@ func warn(format string, args ...any) {
 func Execute() {
 	dispatchByName()
 
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
+	rootCmd.SilenceUsage = true
+	rootCmd.SilenceErrors = true
+	os.Exit(exitCode(rootCmd.Execute()))
+}
+
+func exitCode(err error) int {
+	if err == nil {
+		return exitStatus
 	}
 
-	os.Exit(exitStatus)
+	var ee *exitError
+	if !errors.As(err, &ee) {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
+
+	if ee.err != nil {
+		fmt.Fprintln(os.Stderr, ee.err)
+	}
+	return ee.code
 }
 
 func dispatchByName() {

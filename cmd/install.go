@@ -30,7 +30,7 @@ var installCmd = &cobra.Command{
 	Long: `Create one executable per command in <dir>
 Rerun with --force after rebuilding to refresh them.`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		force, _ := cmd.Flags().GetBool("force")
 		mode := keepExisting
 		if force {
@@ -39,17 +39,14 @@ Rerun with --force after rebuilding to refresh them.`,
 
 		exe, err := os.Executable()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "install: %v\n", err)
-			os.Exit(1)
+			return fail(1, "install: %v", err)
 		}
 
 		dir := args[0]
 		if err := os.MkdirAll(dir, dirPerm); err != nil {
-			fmt.Fprintf(os.Stderr, "install: %v\n", err)
-			os.Exit(1)
+			return fail(1, "install: %v", err)
 		}
 
-		failed := false
 		ext := filepath.Ext(exe)
 		for _, c := range rootCmd.Commands() {
 			if nonToolCmds[c.Name()] {
@@ -58,17 +55,14 @@ Rerun with --force after rebuilding to refresh them.`,
 
 			dst := filepath.Join(dir, c.Name()+ext)
 			if err := installOne(exe, dst, mode); err != nil {
-				fmt.Fprintf(os.Stderr, "install: %v\n", err)
-				failed = true
+				warn("install: %v\n", err)
 				continue
 			}
 
 			fmt.Println(dst)
 		}
 
-		if failed {
-			os.Exit(1)
-		}
+		return nil
 	},
 }
 
