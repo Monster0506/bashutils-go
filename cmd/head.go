@@ -22,7 +22,7 @@ var headCmd = &cobra.Command{
 			}
 		} else {
 			// Expand glob patterns in arguments
-			expandedArgs, err := utils.ExpandGlobsForReading(args)
+			expandedArgs, err := utils.ExpandGlobs(args)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "head: %v\n", err)
 				return

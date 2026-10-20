@@ -15,7 +15,7 @@ func ReadAllFromFilesOrStdin(files []string) (string, error) {
 	}
 
 	// Expand glob patterns in file arguments
-	expandedFiles, err := ExpandGlobsForReading(files)
+	expandedFiles, err := ExpandGlobs(files)
 	if err != nil {
 		return "", err
 	}
@@ -68,7 +68,7 @@ func ReadLinesFromFilesOrStdin(files []string) ([]string, error) {
 	}
 
 	// Expand glob patterns in file arguments
-	expandedFiles, err := ExpandGlobsForReading(files)
+	expandedFiles, err := ExpandGlobs(files)
 	if err != nil {
 		return nil, err
 	}

@@ -29,7 +29,7 @@ var tailCmd = &cobra.Command{
 			}
 		} else {
 			// Expand glob patterns in arguments
-			expandedArgs, err := utils.ExpandGlobsForReading(args)
+			expandedArgs, err := utils.ExpandGlobs(args)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "tail: %v\n", err)
 				return

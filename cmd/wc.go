@@ -45,7 +45,7 @@ var wcCmd = &cobra.Command{
 			}
 			entries = append(entries, fileEntry{"", []byte(data)})
 		} else {
-			expandedArgs, err := utils.ExpandGlobsForReading(args)
+			expandedArgs, err := utils.ExpandGlobs(args)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "wc: %v\n", err)
 				return

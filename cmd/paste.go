@@ -40,7 +40,7 @@ var pasteCmd = &cobra.Command{
 				expandedArgs = append(expandedArgs, "-")
 				continue
 			}
-			expanded, err := utils.ExpandGlobsForReading([]string{arg})
+			expanded, err := utils.ExpandGlobs([]string{arg})
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "paste: %v\n", err)
 				return

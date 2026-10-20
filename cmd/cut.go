@@ -47,7 +47,7 @@ var cutCmd = &cobra.Command{
 			}
 		} else {
 			// Expand glob patterns in file argument
-			expandedFiles, err := utils.ExpandGlobsForReading(args)
+			expandedFiles, err := utils.ExpandGlobs(args)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "cut: %v\n", err)
 				return

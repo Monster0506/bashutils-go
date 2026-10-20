@@ -45,54 +45,6 @@ func containsGlobChars(s string) bool {
 	return strings.ContainsAny(s, "*?[")
 }
 
-// ExpandGlobsWithValidation expands globs and validates that files exist
-// It's similar to ExpandGlobs but filters out non-existent files
-func ExpandGlobsWithValidation(args []string) ([]string, error) {
-	expanded, err := ExpandGlobs(args)
-	if err != nil {
-		return nil, err
-	}
-
-	var valid []string
-	for _, path := range expanded {
-		if _, err := os.Stat(path); err == nil {
-			valid = append(valid, path)
-		} else if os.IsNotExist(err) {
-			// Skip non-existent files
-			continue
-		} else {
-			// Return error for other issues (permission denied, etc.)
-			return nil, fmt.Errorf("error accessing %s: %v", path, err)
-		}
-	}
-
-	return valid, nil
-}
-
-// ExpandGlobsForReading expands globs and returns only readable files
-func ExpandGlobsForReading(args []string) ([]string, error) {
-	expanded, err := ExpandGlobs(args)
-	if err != nil {
-		return nil, err
-	}
-
-	var readable []string
-	for _, path := range expanded {
-		if file, err := os.Open(path); err == nil {
-			file.Close()
-			readable = append(readable, path)
-		} else if os.IsNotExist(err) {
-			// Skip non-existent files
-			continue
-		} else {
-			// Return error for other issues (permission denied, etc.)
-			return nil, fmt.Errorf("error accessing %s: %v", path, err)
-		}
-	}
-
-	return readable, nil
-}
-
 // ExpandEnvironmentVariables expands both Unix-style ($VAR) and Windows-style (%VAR%) environment variables
 func ExpandEnvironmentVariables(input string) string {
 	// First expand Unix-style variables ($VAR)

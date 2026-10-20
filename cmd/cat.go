@@ -21,7 +21,7 @@ var catCmd = &cobra.Command{
 			return
 		}
 
-		expandedArgs, err := utils.ExpandGlobsForReading(args)
+		expandedArgs, err := utils.ExpandGlobs(args)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cat: %v\n", err)
 			return

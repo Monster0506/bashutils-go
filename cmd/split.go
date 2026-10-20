@@ -39,7 +39,7 @@ var splitCmd = &cobra.Command{
 		if filePath == "-" {
 			inputFile = os.Stdin
 		} else {
-			expandedFiles, err := utils.ExpandGlobsForReading([]string{filePath})
+			expandedFiles, err := utils.ExpandGlobs([]string{filePath})
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "split: %v\n", err)
 				return
