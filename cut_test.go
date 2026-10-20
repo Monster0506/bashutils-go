@@ -29,3 +29,22 @@ func TestCutOpenRanges(t *testing.T) {
 		}
 	}
 }
+
+func TestCutOutputsInInputOrderWithoutDuplicates(t *testing.T) {
+	cases := []struct {
+		in   string
+		args []string
+		want string
+	}{
+		{"a,b,c\n", []string{"-d", ",", "-f", "3,1"}, "a,c\n"},
+		{"a,b,c\n", []string{"-d", ",", "-f", "1,1"}, "a\n"},
+		{"abcd\n", []string{"-c", "2-3,1-2"}, "abc\n"},
+	}
+
+	for _, c := range cases {
+		got := run(t, c.in, append([]string{"cut"}, c.args...)...).stdout
+		if got != c.want {
+			t.Errorf("cut %v: got %q, want %q", c.args, got, c.want)
+		}
+	}
+}

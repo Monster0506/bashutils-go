@@ -120,13 +120,20 @@ func parseRanges(input string) ([]span, error) {
 }
 
 func indicesFor(spans []span, n int) []int {
-	var indices []int
+	picked := make([]bool, n+1)
 	for _, s := range spans {
 		end := s.end
 		if end == openEnd || end > n {
 			end = n
 		}
 		for i := max(s.start, 1); i <= end; i++ {
+			picked[i] = true
+		}
+	}
+
+	var indices []int
+	for i := 1; i <= n; i++ {
+		if picked[i] {
 			indices = append(indices, i)
 		}
 	}
