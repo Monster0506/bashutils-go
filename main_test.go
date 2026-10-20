@@ -14,11 +14,19 @@ import (
 
 const runTimeout = 10 * time.Second
 
-var binPath string
+var (
+	binPath  string
+	emptyDir string
+)
 
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "bashutils-test")
 	if err != nil {
+		panic(err)
+	}
+
+	emptyDir = filepath.Join(dir, "empty")
+	if err := os.Mkdir(emptyDir, 0o755); err != nil {
 		panic(err)
 	}
 
@@ -43,11 +51,34 @@ type result struct {
 func run(t *testing.T, stdin string, args ...string) result {
 	t.Helper()
 
+	return runBin(t, binPath, stdin, args...)
+}
+
+func runAs(t *testing.T, name, stdin string, args ...string) result {
+	t.Helper()
+
+	data, err := os.ReadFile(binPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	return runBin(t, path, stdin, args...)
+}
+
+func runBin(t *testing.T, bin, stdin string, args ...string) result {
+	t.Helper()
+
 	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, binPath, args...)
+	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Stdin = strings.NewReader(stdin)
+	cmd.Env = []string{"PATH=" + emptyDir, "SystemRoot=" + os.Getenv("SystemRoot")}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

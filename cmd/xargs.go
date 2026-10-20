@@ -197,43 +197,49 @@ func executeCommand(command []string, args []string, replaceStr string, verbose 
 	}
 }
 
-const childFailedStatus = 123
+const (
+	childFailedStatus = 123
+	selfName          = "bashutils"
+)
 
 func executeSingleCommand(args []string, verbose bool) {
 	if verbose {
 		fmt.Fprintln(os.Stderr, strings.Join(args, " "))
 	}
 
-	// Check if the first argument is "bashutils" and handle it specially
-	if len(args) > 0 && args[0] == "bashutils" {
-		// Execute bashutils subcommand directly
-		if len(args) > 1 {
-			// Create a new command with the subcommand
-			subCmd := exec.Command(os.Args[0], args[1:]...)
-			subCmd.Stdout = os.Stdout
-			subCmd.Stderr = os.Stderr
-			subCmd.Stdin = os.Stdin
-
-			err := subCmd.Run()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "xargs: command failed: %v\n", err)
-				exitStatus = childFailedStatus
-			}
-			return
-		}
-	}
-
-	// Regular command execution
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := buildCommand(args)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
-	err := cmd.Run()
-	if err != nil {
+	if err := cmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "xargs: command failed: %v\n", err)
 		exitStatus = childFailedStatus
 	}
+}
+
+func buildCommand(args []string) *exec.Cmd {
+	if args[0] == selfName && len(args) > 1 {
+		args = args[1:]
+	}
+
+	exe, err := os.Executable()
+	if err != nil || !isBuiltin(args[0]) {
+		return exec.Command(args[0], args[1:]...)
+	}
+
+	cmd := exec.Command(exe, args...)
+	cmd.Args[0] = selfName
+	return cmd
+}
+
+func isBuiltin(name string) bool {
+	for _, c := range rootCmd.Commands() {
+		if c.Name() == name && !nonToolCmds[name] {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {

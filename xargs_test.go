@@ -63,3 +63,19 @@ func TestXargsContinuesAfterFailure(t *testing.T) {
 		t.Fatalf("stdout %q, code %d", r.stdout, r.code)
 	}
 }
+
+func TestXargsRunsBuiltinCommands(t *testing.T) {
+	got := run(t, "a\n", "xargs", "echo", "hi").stdout
+
+	if want := "hi a\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestXargsRunsBuiltinWhenInvokedByLinkName(t *testing.T) {
+	got := runAs(t, "xargs.exe", "a\n", "echo").stdout
+
+	if want := "a\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
