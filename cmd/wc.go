@@ -20,6 +20,10 @@ var wcCmd = &cobra.Command{
 		showBytes, _ := cmd.Flags().GetBool("bytes")
 		showChars, _ := cmd.Flags().GetBool("chars")
 
+		if !showLines && !showWords && !showBytes && !showChars {
+			showLines, showWords, showBytes = true, true, true
+		}
+
 		var totalLines, totalWords, totalBytes, totalChars int
 		var validFiles []string
 		var allCounts []struct {
@@ -131,22 +135,11 @@ var wcCmd = &cobra.Command{
 				out = append(out, fmt.Sprintf("%*d", maxCharsWidth, count.chars))
 			}
 
-			// Default if no flags provided: print all
 			suffix := ""
 			if count.path != "" {
 				suffix = " " + count.path
 			}
-			if len(out) == 0 {
-				fmt.Printf("%*d %*d %*d %*d%s\n",
-					maxLinesWidth, count.lines,
-					maxWordsWidth, count.words,
-					maxBytesWidth, count.bytes,
-					maxCharsWidth, count.chars,
-					suffix,
-				)
-			} else {
-				fmt.Printf("%s%s\n", strings.Join(out, " "), suffix)
-			}
+			fmt.Printf("%s%s\n", strings.Join(out, " "), suffix)
 		}
 
 		// Print totals if multiple files
@@ -165,16 +158,7 @@ var wcCmd = &cobra.Command{
 				out = append(out, fmt.Sprintf("%*d", maxCharsWidth, totalChars))
 			}
 
-			if len(out) == 0 {
-				fmt.Printf("%*d %*d %*d %*d total\n",
-					maxLinesWidth, totalLines,
-					maxWordsWidth, totalWords,
-					maxBytesWidth, totalBytes,
-					maxCharsWidth, totalChars,
-				)
-			} else {
-				fmt.Printf("%s total\n", strings.Join(out, " "))
-			}
+			fmt.Printf("%s total\n", strings.Join(out, " "))
 		}
 	},
 }
