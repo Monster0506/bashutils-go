@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"os"
-	"sort"
 
 	"github.com/spf13/cobra"
 )
@@ -23,11 +22,6 @@ var uniqCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "uniq: %v\n", err)
 			return
 		}
-
-		// uniq typically operates on sorted input.
-		// For simplicity, we'll sort here if the input isn't guaranteed to be.
-		// A more "unix-like" implementation would expect sorted input from a pipe.
-		sort.Strings(allLines)
 
 		if len(allLines) == 0 {
 			return
