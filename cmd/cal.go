@@ -76,7 +76,9 @@ func printMonth(month, year int) {
 		}
 		day++
 	}
-	fmt.Println()
+	if (startWeekday+daysInMonth)%7 != 0 {
+		fmt.Println()
+	}
 }
 
 // printYear prints the full year calendar
