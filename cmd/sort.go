@@ -27,7 +27,7 @@ var sortCmd = &cobra.Command{
 			return
 		}
 
-		sort.Slice(allLines, func(i, j int) bool {
+		sort.SliceStable(allLines, func(i, j int) bool {
 			var keyI, keyJ string
 
 			if column > 0 {
