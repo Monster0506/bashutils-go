@@ -28,3 +28,27 @@ func TestPasteDelimiterEscapes(t *testing.T) {
 		}
 	}
 }
+
+func TestPasteSerial(t *testing.T) {
+	f1 := writeFile(t, "a.txt", "1\n2\n3\n")
+	f2 := writeFile(t, "b.txt", "4\n5\n")
+
+	cases := []struct {
+		in   string
+		args []string
+		want string
+	}{
+		{"", []string{"-s", f1, f2}, "1\t2\t3\n4\t5\n"},
+		{"", []string{"-sd,", f1, f2}, "1,2,3\n4,5\n"},
+		{"a\nb\n", []string{"-s"}, "a\tb\n"},
+		{"1\n2\n3\n4\n", []string{"-s", "-d", ",;"}, "1,2;3,4\n"},
+		{"", []string{"-s", f2, f1}, "4\t5\n1\t2\t3\n"},
+	}
+
+	for _, c := range cases {
+		got := run(t, c.in, append([]string{"paste"}, c.args...)...).stdout
+		if got != c.want {
+			t.Errorf("paste %v: got %q, want %q", c.args, got, c.want)
+		}
+	}
+}

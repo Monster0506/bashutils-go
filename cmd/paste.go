@@ -22,51 +22,69 @@ var pasteCmd = &cobra.Command{
 			delimiters = parseDelimiters(delimitersStr)
 		}
 
-		if serial {
-			return fail(1, "paste: --serial flag is not yet implemented")
-		}
-
 		scanners, closeAll, err := openScanners(resolveInputs("paste", args, reportErrors))
 		defer closeAll()
 		if err != nil {
 			return err
 		}
 
-		moreData := true
-		for moreData {
-			currentLines := make([]string, len(scanners))
-			moreData = false
-			for i, scanner := range scanners {
-				if scanner.Scan() {
-					currentLines[i] = scanner.Text()
-					moreData = true
-					continue
-				}
-				if err := scanner.Err(); err != nil {
-					return fail(1, "paste: reading input: %v", err)
-				}
-			}
-
-			if !moreData {
-				break
-			}
-
-			var out strings.Builder
-			for i, line := range currentLines {
-				out.WriteString(line)
-				if i < len(currentLines)-1 {
-					out.WriteString(delimiters[i%len(delimiters)])
-				}
-			}
-			fmt.Println(out.String())
+		if serial {
+			return pasteSerial(scanners, delimiters)
 		}
-		return nil
+		return pasteParallel(scanners, delimiters)
 	},
+}
+
+func pasteSerial(scanners []*utils.LineScanner, delimiters []string) error {
+	for _, scanner := range scanners {
+		var out strings.Builder
+		for i := 0; scanner.Scan(); i++ {
+			if i > 0 {
+				out.WriteString(delimiters[(i-1)%len(delimiters)])
+			}
+			out.WriteString(scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			return fail(1, "paste: reading input: %v", err)
+		}
+		fmt.Println(out.String())
+	}
+	return nil
+}
+
+func pasteParallel(scanners []*utils.LineScanner, delimiters []string) error {
+	for {
+		currentLines := make([]string, len(scanners))
+		moreData := false
+		for i, scanner := range scanners {
+			if scanner.Scan() {
+				currentLines[i] = scanner.Text()
+				moreData = true
+				continue
+			}
+			if err := scanner.Err(); err != nil {
+				return fail(1, "paste: reading input: %v", err)
+			}
+		}
+
+		if !moreData {
+			return nil
+		}
+
+		var out strings.Builder
+		for i, line := range currentLines {
+			out.WriteString(line)
+			if i < len(currentLines)-1 {
+				out.WriteString(delimiters[i%len(delimiters)])
+			}
+		}
+		fmt.Println(out.String())
+	}
 }
 
 func init() {
 	pasteCmd.Flags().StringP("delimiters", "d", "", "use specified delimiters instead of TAB")
-	pasteCmd.Flags().BoolP("serial", "s", false, "paste one file at a time instead of in parallel (not yet implemented)")
+	pasteCmd.Flags().BoolP("serial", "s", false, "paste one file at a time instead of in parallel")
 }
 
 func openScanners(inputs []input) ([]*utils.LineScanner, func(), error) {
