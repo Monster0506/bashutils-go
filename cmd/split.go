@@ -16,12 +16,11 @@ var splitCmd = &cobra.Command{
 	Use:   "split [file] [prefix]",
 	Short: "Split files into pieces",
 	Args:  cobra.RangeArgs(1, 2), // file and optional prefix
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		linesPerFile, _ := cmd.Flags().GetInt64("lines")
 		bytesPerFile, _ := cmd.Flags().GetString("bytes")
 		numericSuffixes, _ := cmd.Flags().GetBool("numeric-suffixes")
 
-		filePath := args[0]
 		prefix := "x"
 		if len(args) > 1 {
 			prefix = args[1]
@@ -31,37 +30,26 @@ var splitCmd = &cobra.Command{
 			linesPerFile = 1000
 		}
 		if linesPerFile > 0 && bytesPerFile != "" {
-			warn("split: cannot split by lines and bytes simultaneously\n")
-			return
+			return fail(1, "split: cannot split by lines and bytes simultaneously")
 		}
 
-		var inputFile *os.File
-		if filePath == "-" {
-			inputFile = os.Stdin
-		} else {
-			expandedFiles, err := utils.ExpandGlobs([]string{filePath})
-			if err != nil {
-				warn("split: %v\n", err)
-				return
-			}
-			if len(expandedFiles) == 0 {
-				warn("split: no matching files found\n")
-				return
-			}
-			f, err := os.Open(expandedFiles[0])
-			if err != nil {
-				warn("split: %v\n", err)
-				return
-			}
-			defer f.Close()
-			inputFile = f
+		inputs := resolveInputs("split", args[:1], reportErrors)
+		if len(inputs) == 0 {
+			return exitWith(1)
 		}
+
+		r := openInput("split", inputs[0], reportErrors)
+		if r == nil {
+			return exitWith(1)
+		}
+		defer r.Close()
 
 		if linesPerFile > 0 {
-			splitByLines(inputFile, prefix, linesPerFile, numericSuffixes)
-		} else if bytesPerFile != "" {
-			splitByBytes(inputFile, prefix, bytesPerFile, numericSuffixes)
+			splitByLines(r, prefix, linesPerFile, numericSuffixes)
+		} else {
+			splitByBytes(r, prefix, bytesPerFile, numericSuffixes)
 		}
+		return nil
 	},
 }
 
@@ -84,7 +72,7 @@ func generateSuffix(index int, numeric bool) string {
 	return suf
 }
 
-func splitByLines(inputFile *os.File, prefix string, linesPerFile int64, numericSuffixes bool) {
+func splitByLines(inputFile io.Reader, prefix string, linesPerFile int64, numericSuffixes bool) {
 	scanner := utils.NewScanner(inputFile)
 	fileIndex := 0
 	currentLineCount := int64(0)
@@ -165,7 +153,7 @@ func parseBytesString(bytesStr string) (int64, error) {
 	return value * multiplier, nil
 }
 
-func splitByBytes(inputFile *os.File, prefix string, bytesPerFileStr string, numericSuffixes bool) {
+func splitByBytes(inputFile io.Reader, prefix string, bytesPerFileStr string, numericSuffixes bool) {
 	bytesPerFile, err := parseBytesString(bytesPerFileStr)
 	if err != nil {
 		warn("split: %v\n", err)
