@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -19,7 +18,7 @@ var uniqCmd = &cobra.Command{
 
 		allLines, err := utils.ReadLinesFromFilesOrStdin(args)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "uniq: %v\n", err)
+			warn("uniq: %v\n", err)
 			return
 		}
 

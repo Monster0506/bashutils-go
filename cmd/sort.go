@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/monster0506/bashutils-go/internal/utils"
 	"github.com/spf13/cobra"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -24,7 +23,7 @@ var sortCmd = &cobra.Command{
 
 		allLines, err := utils.ReadLinesFromFilesOrStdin(args)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "sort: %v\n", err)
+			warn("sort: %v\n", err)
 			return
 		}
 

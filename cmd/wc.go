@@ -40,20 +40,20 @@ var wcCmd = &cobra.Command{
 		if len(args) == 0 {
 			data, err := utils.ReadAllFromReader(os.Stdin)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "wc: %v\n", err)
+				warn("wc: %v\n", err)
 				return
 			}
 			entries = append(entries, fileEntry{"", []byte(data)})
 		} else {
 			expandedArgs, err := utils.ExpandGlobs(args)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "wc: %v\n", err)
+				warn("wc: %v\n", err)
 				return
 			}
 			for _, path := range expandedArgs {
 				data, err := os.ReadFile(path)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "wc: %v\n", err)
+					warn("wc: %v\n", err)
 					continue
 				}
 				entries = append(entries, fileEntry{path, data})

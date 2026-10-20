@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,12 +16,21 @@ var rootCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 }
 
+var exitStatus int
+
+func warn(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, format, args...)
+	exitStatus = 1
+}
+
 func Execute() {
 	dispatchByName()
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+
+	os.Exit(exitStatus)
 }
 
 func dispatchByName() {

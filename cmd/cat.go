@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"os"
 
@@ -16,27 +15,27 @@ var catCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
-				fmt.Fprintf(os.Stderr, "cat: %v\n", err)
+				warn("cat: %v\n", err)
 			}
 			return
 		}
 
 		expandedArgs, err := utils.ExpandGlobs(args)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "cat: %v\n", err)
+			warn("cat: %v\n", err)
 			return
 		}
 
 		for _, path := range expandedArgs {
 			if path == "-" {
 				if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
-					fmt.Fprintf(os.Stderr, "cat: %v\n", err)
+					warn("cat: %v\n", err)
 				}
 				continue
 			}
 			data, err := os.ReadFile(path)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "cat: %v\n", err)
+				warn("cat: %v\n", err)
 				continue
 			}
 			os.Stdout.Write(data)

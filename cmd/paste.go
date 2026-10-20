@@ -24,7 +24,7 @@ var pasteCmd = &cobra.Command{
 		}
 
 		if serial {
-			fmt.Fprintf(os.Stderr, "paste: --serial flag is not yet implemented.\n")
+			warn("paste: --serial flag is not yet implemented.\n")
 			os.Exit(1)
 			return
 		}
@@ -42,7 +42,7 @@ var pasteCmd = &cobra.Command{
 			}
 			expanded, err := utils.ExpandGlobs([]string{arg})
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "paste: %v\n", err)
+				warn("paste: %v\n", err)
 				return
 			}
 			expandedArgs = append(expandedArgs, expanded...)
@@ -59,7 +59,7 @@ var pasteCmd = &cobra.Command{
 			}
 			file, err := os.Open(filePath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "paste: %v\n", err)
+				warn("paste: %v\n", err)
 				return
 			}
 			files[i] = file
@@ -84,7 +84,7 @@ var pasteCmd = &cobra.Command{
 					moreData = true
 				} else {
 					if err := scanner.Err(); err != nil {
-						fmt.Fprintf(os.Stderr, "paste: reading input: %v\n", err)
+						warn("paste: reading input: %v\n", err)
 						return
 					}
 					currentLines[i] = "" // Pad with empty string if file finished

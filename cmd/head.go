@@ -24,7 +24,7 @@ var headCmd = &cobra.Command{
 			// Expand glob patterns in arguments
 			expandedArgs, err := utils.ExpandGlobs(args)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "head: %v\n", err)
+				warn("head: %v\n", err)
 				return
 			}
 
@@ -35,7 +35,7 @@ var headCmd = &cobra.Command{
 
 				f, err := os.Open(path)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "head: %v\n", err)
+					warn("head: %v\n", err)
 					continue
 				}
 				defer f.Close()

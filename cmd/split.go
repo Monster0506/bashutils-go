@@ -31,7 +31,7 @@ var splitCmd = &cobra.Command{
 			linesPerFile = 1000
 		}
 		if linesPerFile > 0 && bytesPerFile != "" {
-			fmt.Fprintf(os.Stderr, "split: cannot split by lines and bytes simultaneously\n")
+			warn("split: cannot split by lines and bytes simultaneously\n")
 			return
 		}
 
@@ -41,16 +41,16 @@ var splitCmd = &cobra.Command{
 		} else {
 			expandedFiles, err := utils.ExpandGlobs([]string{filePath})
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "split: %v\n", err)
+				warn("split: %v\n", err)
 				return
 			}
 			if len(expandedFiles) == 0 {
-				fmt.Fprintf(os.Stderr, "split: no matching files found\n")
+				warn("split: no matching files found\n")
 				return
 			}
 			f, err := os.Open(expandedFiles[0])
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "split: %v\n", err)
+				warn("split: %v\n", err)
 				return
 			}
 			defer f.Close()
@@ -102,7 +102,7 @@ func splitByLines(inputFile *os.File, prefix string, linesPerFile int64, numeric
 			outputFileName := prefix + suffix
 			outputFile, err = os.Create(outputFileName)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "split: creating output file: %v\n", err)
+				warn("split: creating output file: %v\n", err)
 				return
 			}
 			outputWriter = bufio.NewWriter(outputFile)
@@ -111,7 +111,7 @@ func splitByLines(inputFile *os.File, prefix string, linesPerFile int64, numeric
 
 		_, err = outputWriter.WriteString(scanner.Text() + "\n")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "split: writing to output file: %v\n", err)
+			warn("split: writing to output file: %v\n", err)
 			return
 		}
 		currentLineCount++
@@ -122,7 +122,7 @@ func splitByLines(inputFile *os.File, prefix string, linesPerFile int64, numeric
 	}
 
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "split: reading input: %v\n", err)
+		warn("split: reading input: %v\n", err)
 	}
 	if outputFile != nil {
 		outputWriter.Flush()
@@ -165,7 +165,7 @@ func parseBytesString(bytesStr string) (int64, error) {
 func splitByBytes(inputFile *os.File, prefix string, bytesPerFileStr string, numericSuffixes bool) {
 	bytesPerFile, err := parseBytesString(bytesPerFileStr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "split: %v\n", err)
+		warn("split: %v\n", err)
 		return
 	}
 
@@ -173,20 +173,20 @@ func splitByBytes(inputFile *os.File, prefix string, bytesPerFileStr string, num
 	for fileIndex := 0; ; fileIndex++ {
 		if _, err := reader.Peek(1); err != nil {
 			if err != io.EOF {
-				fmt.Fprintf(os.Stderr, "split: reading input: %v\n", err)
+				warn("split: reading input: %v\n", err)
 			}
 			return
 		}
 
 		outputFile, err := os.Create(prefix + generateSuffix(fileIndex, numericSuffixes))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "split: creating output file: %v\n", err)
+			warn("split: creating output file: %v\n", err)
 			return
 		}
 
 		_, copyErr := io.CopyN(outputFile, reader, bytesPerFile)
 		if err := outputFile.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "split: closing output file: %v\n", err)
+			warn("split: closing output file: %v\n", err)
 			return
 		}
 
@@ -194,7 +194,7 @@ func splitByBytes(inputFile *os.File, prefix string, bytesPerFileStr string, num
 			return
 		}
 		if copyErr != nil {
-			fmt.Fprintf(os.Stderr, "split: copying to output file: %v\n", copyErr)
+			warn("split: copying to output file: %v\n", copyErr)
 			return
 		}
 	}

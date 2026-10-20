@@ -20,7 +20,7 @@ var cutCmd = &cobra.Command{
 		characters, _ := cmd.Flags().GetString("characters")
 
 		if (fields == "" && characters == "") || (fields != "" && characters != "") {
-			fmt.Fprintf(os.Stderr, "cut: specify either --fields or --characters\n")
+			warn("cut: specify either --fields or --characters\n")
 			return
 		}
 
@@ -30,7 +30,7 @@ var cutCmd = &cobra.Command{
 		}
 		spans, err := parseRanges(list)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "cut: invalid list %q: %v\n", list, err)
+			warn("cut: invalid list %q: %v\n", list, err)
 			os.Exit(1)
 		}
 
@@ -49,14 +49,14 @@ var cutCmd = &cobra.Command{
 			// Expand glob patterns in file argument
 			expandedFiles, err := utils.ExpandGlobs(args)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "cut: %v\n", err)
+				warn("cut: %v\n", err)
 				return
 			}
 
 			for _, path := range expandedFiles {
 				file, err := os.Open(path)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "cut: %v\n", err)
+					warn("cut: %v\n", err)
 					continue
 				}
 				defer file.Close()
@@ -72,7 +72,7 @@ var cutCmd = &cobra.Command{
 				}
 
 				if err := scanner.Err(); err != nil {
-					fmt.Fprintf(os.Stderr, "cut: reading input: %v\n", err)
+					warn("cut: reading input: %v\n", err)
 				}
 			}
 		}

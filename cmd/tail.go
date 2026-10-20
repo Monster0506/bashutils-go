@@ -31,7 +31,7 @@ var tailCmd = &cobra.Command{
 			// Expand glob patterns in arguments
 			expandedArgs, err := utils.ExpandGlobs(args)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "tail: %v\n", err)
+				warn("tail: %v\n", err)
 				return
 			}
 
@@ -42,7 +42,7 @@ var tailCmd = &cobra.Command{
 
 				f, err := os.Open(path)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "tail: %v\n", err)
+					warn("tail: %v\n", err)
 					continue
 				}
 				defer f.Close()
