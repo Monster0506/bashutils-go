@@ -49,11 +49,6 @@ If only the year is given, the full year is displayed.`,
 	},
 }
 
-func init() {
-	// Register the cal command
-	rootCmd.AddCommand(calCmd)
-}
-
 // printMonth prints a single month calendar
 func printMonth(month, year int) {
 	monthName := time.Month(month).String()
